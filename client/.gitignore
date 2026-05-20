@@ -4,6 +4,5 @@ dist/
 .env
 .env.*
 
-src/Utils/firebase.js
 
 npm-debug.log*
