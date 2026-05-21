@@ -1,35 +1,47 @@
-import React from 'react'
-import { FaArrowLeft } from 'react-icons/fa';
+import React from 'react';
+import { ArrowLeft, Download, Code2, Activity, Video, BrainCircuit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from "motion/react"
+import { motion } from "motion/react";
 import { buildStyles, CircularProgressbar } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
-import toast from "react-hot-toast"
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from "recharts";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import toast from "react-hot-toast";
 
 function Step3Report({ report }) {
+  const navigate = useNavigate();
+
   if (!report) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500 text-lg">Loading Report...</p>
+      <div className="min-h-screen flex items-center justify-center bg-bg-primary">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-accent-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Crunching Analytics...</p>
+        </div>
       </div>
     );
   }
-  const navigate = useNavigate()
-  const {
-    finalScore = 0,
-    confidence = 0,
-    communication = 0,
-    correctness = 0,
-    questionWiseScore = [],
-  } = report;
+  
+  // DEFENSIVE PROGRAMMING: Fallbacks for missing data
+  const finalScore = report?.finalScore ?? 0;
+  const confidence = report?.confidence ?? 0;
+  const communication = report?.communication ?? 0;
+  const correctness = report?.correctness ?? 0;
+  const questionWiseScore = report?.questionWiseScore ?? [];
 
-  const questionScoreData = questionWiseScore.map((score, index) => ({
+  const questionScoreData = questionWiseScore.map((q, index) => ({
     name: `Q${index + 1}`,
-    score: score.score || 0
-  }))
+    score: q?.score ?? 0
+  }));
+
+  const radarData = [
+    { subject: 'Confidence', A: confidence * 10, fullMark: 100 },
+    { subject: 'Communication', A: communication * 10, fullMark: 100 },
+    { subject: 'Correctness', A: correctness * 10, fullMark: 100 },
+    { subject: 'Problem Solving', A: Math.max(0, (finalScore * 10) - 5), fullMark: 100 },
+    { subject: 'Structure', A: Math.min(100, (communication * 10) + 5), fullMark: 100 },
+  ];
 
   const skills = [
     { label: "Confidence", value: confidence },
@@ -37,380 +49,338 @@ function Step3Report({ report }) {
     { label: "Correctness", value: correctness },
   ];
 
-  let performanceText = "";
-  let shortTagline = "";
+  let performanceText = "Needs Focus";
+  let shortTagline = "Work on clarity, confidence, and accuracy.";
 
   if (finalScore >= 8) {
-    performanceText = "Ready for job opportunities.";
-    shortTagline = "Excellent clarity and structured responses.";
+    performanceText = "Elite Performance";
+    shortTagline = "Top 10% - Ready for FAANG interviews.";
   } else if (finalScore >= 5) {
-    performanceText = "Needs minor improvement before interviews.";
-    shortTagline = "Good foundation, refine articulation.";
-  } else {
-    performanceText = "Significant improvement required.";
-    shortTagline = "Work on clarity and confidence.";
+    performanceText = "Solid Foundation";
+    shortTagline = "Good structure, but refine articulation.";
   }
 
-  const score = finalScore;
-  const percentage = (score / 10) * 100;
-
+  const percentage = (finalScore / 10) * 100;
 
   const downloadPDF = async () => {
-  const toastId = toast.loading("Generating PDF Report...");
+    const toastId = toast.loading("Generating PDF Report...");
+    await new Promise(resolve => setTimeout(resolve, 100));
 
-  // Small delay so the toast can render before sync blocking PDF gen
-  await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      const doc = new jsPDF("p", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      const contentWidth = pageWidth - margin * 2;
+      let currentY = 25;
 
-  try {
-  const doc = new jsPDF("p", "mm", "a4");
+      // Dark theme PDF styling
+      doc.setFillColor(11, 17, 32); // #0B1120
+      doc.rect(0, 0, pageWidth, 40, "F");
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 20;
-  const contentWidth = pageWidth - margin * 2;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(255, 255, 255);
+      doc.text("InterviewForge AI Report", pageWidth / 2, 25, { align: "center" });
 
-  let currentY = 25;
+      currentY = 55;
 
-  // ================= TITLE =================
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(34, 197, 94);
-  doc.text("AI Interview Performance Report", pageWidth / 2, currentY, {
-    align: "center",
-  });
+      doc.setFillColor(243, 244, 246);
+      doc.roundedRect(margin, currentY, contentWidth, 20, 4, 4, "F");
+      doc.setFontSize(14);
+      doc.setTextColor(31, 41, 55); // #1f2937 sleek dark gray
+      doc.text(`Final Score: ${finalScore}/10`, pageWidth / 2, currentY + 13, { align: "center" });
 
-  currentY += 5;
+      currentY += 30;
 
-  // underline
-  doc.setDrawColor(34, 197, 94);
-  doc.line(margin, currentY + 2, pageWidth - margin, currentY + 2);
+      doc.setFillColor(249, 250, 251);
+      doc.roundedRect(margin, currentY, contentWidth, 30, 4, 4, "F");
+      doc.setFontSize(12);
+      doc.text(`Confidence: ${confidence}/10`, margin + 10, currentY + 10);
+      doc.text(`Communication: ${communication}/10`, margin + 10, currentY + 18);
+      doc.text(`Correctness: ${correctness}/10`, margin + 10, currentY + 26);
 
-  currentY += 15;
+      currentY += 45;
 
-  // ================= FINAL SCORE BOX =================
-  doc.setFillColor(240, 253, 244);
-  doc.roundedRect(margin, currentY, contentWidth, 20, 4, 4, "F");
+      let advice = "";
+      if (finalScore >= 8) {
+        advice = "Excellent performance. Maintain confidence and structure. Continue refining clarity and supporting answers with strong real-world examples.";
+      } else if (finalScore >= 5) {
+        advice = "Good foundation shown. Improve clarity and structure. Practice delivering concise, confident answers with stronger supporting examples.";
+      } else {
+        advice = "Significant improvement required. Focus on structured thinking, clarity, and confident delivery. Practice answering aloud regularly.";
+      }
 
-  doc.setFontSize(14);
-  doc.setTextColor(0, 0, 0);
-  doc.text(
-    `Final Score: ${finalScore}/10`,
-    pageWidth / 2,
-    currentY + 12,
-    { align: "center" }
-  );
+      doc.setFont("helvetica", "bold");
+      doc.text("Professional Advice", margin, currentY);
+      currentY += 8;
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const splitAdvice = doc.splitTextToSize(advice, contentWidth);
+      doc.text(splitAdvice, margin, currentY);
 
-  currentY += 30;
+      currentY += (splitAdvice.length * 6) + 10;
 
-  // ================= SKILLS BOX =================
-  doc.setFillColor(249, 250, 251);
-  doc.roundedRect(margin, currentY, contentWidth, 30, 4, 4, "F");
+      // Defensive mapping for autoTable
+      autoTable(doc, {
+        startY: currentY,
+        margin: { left: margin, right: margin },
+        head: [["#", "Question", "Score", "Feedback"]],
+        body: questionWiseScore.map((q, i) => [
+          `${i + 1}`,
+          q?.question || "Unknown Question",
+          `${q?.score ?? 0}/10`,
+          q?.feedback || "No feedback provided",
+        ]),
+        styles: { fontSize: 9, cellPadding: 5, valign: "top", textColor: [55, 65, 81] },
+        headStyles: { fillColor: [139, 92, 246], textColor: 255, halign: "center" }, // Violet-500
+        columnStyles: {
+          0: { cellWidth: 10, halign: "center" },
+          1: { cellWidth: 55 },
+          2: { cellWidth: 20, halign: "center" },
+          3: { cellWidth: "auto" },
+        },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+      });
 
-  doc.setFontSize(12);
-
-  doc.text(`Confidence: ${confidence}`, margin + 10, currentY + 10);
-  doc.text(`Communication: ${communication}`, margin + 10, currentY + 18);
-  doc.text(`Correctness: ${correctness}`, margin + 10, currentY + 26);
-
-  currentY += 45;
-
-  // ================= ADVICE =================
-  let advice = "";
-
-  if (finalScore >= 8) {
-    advice =
-      "Excellent performance. Maintain confidence and structure. Continue refining clarity and supporting answers with strong real-world examples.";
-  } else if (finalScore >= 5) {
-    advice =
-      "Good foundation shown. Improve clarity and structure. Practice delivering concise, confident answers with stronger supporting examples.";
-  } else {
-    advice =
-      "Significant improvement required. Focus on structured thinking, clarity, and confident delivery. Practice answering aloud regularly.";
-  }
-
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(220);
-  doc.roundedRect(margin, currentY, contentWidth, 35, 4, 4);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Professional Advice", margin + 10, currentY + 10);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-
-  const splitAdvice = doc.splitTextToSize(advice, contentWidth - 20);
-  doc.text(splitAdvice, margin + 10, currentY + 20);
-
-  currentY += 50;
-
-  // ================= QUESTION TABLE =================
-  autoTable(doc, {
-  startY: currentY,
-  margin: { left: margin, right: margin },
-  head: [["#", "Question", "Score", "Feedback"]],
-  body: questionWiseScore.map((q, i) => [
-    `${i + 1}`,
-    q.question,
-    `${q.score}/10`,
-    q.feedback,
-  ]),
-  styles: {
-    fontSize: 9,
-    cellPadding: 5,
-    valign: "top",
-  },
-  headStyles: {
-    fillColor: [34, 197, 94],
-    textColor: 255,
-    halign: "center",
-  },
-  columnStyles: {
-    0: { cellWidth: 10, halign: "center" }, // index
-    1: { cellWidth: 55 }, // question
-    2: { cellWidth: 20, halign: "center" }, // score
-    3: { cellWidth: "auto" }, // feedback
-  },
-  alternateRowStyles: {
-    fillColor: [249, 250, 251],
-  },
-});
-
-
-  doc.save("AI_Interview_Report.pdf");
-  
-  toast.success("PDF Report downloaded successfully!", { id: toastId });
-  } catch (error) {
-    toast.error("Failed to generate PDF.", { id: toastId });
-  }
-};
+      doc.save("AI_Interview_Report.pdf");
+      toast.success("PDF Report downloaded successfully!", { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to generate PDF. Check console.", { id: toastId });
+    }
+  };
 
   return (
-    <div className='min-h-screen bg-linear-to-br from-gray-50 to-green-50 px-4 sm:px-6 lg:px-10 py-8'>
-      <div className='mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
-        <div className='md:mb-10 w-full flex items-start gap-4 flex-wrap'>
+    <div className='min-h-screen bg-bg-primary px-4 sm:px-6 lg:px-10 py-10 relative overflow-hidden'>
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-accent-primary/5 blur-[150px] pointer-events-none" />
+
+      <div className='mb-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 relative z-10'>
+        <div className='flex items-center gap-4'>
           <button
             onClick={() => navigate("/history")}
-            className='mt-1 p-3 rounded-full bg-white shadow hover:shadow-md transition'><FaArrowLeft className='text-gray-600' /></button>
-
+            className='p-3 rounded-xl glass border border-white/10 hover:bg-white/10 transition-colors'
+          >
+            <ArrowLeft className='text-gray-300' size={20} />
+          </button>
           <div>
-            <h1 className='text-3xl font-bold flex-nowrap text-gray-800'>
-              Interview Analytics Dashboard
+            <h1 className='text-3xl font-bold tracking-tight text-white'>
+              Analytics <span className="text-gradient">Dashboard</span>
             </h1>
-            <p className='text-gray-500 mt-2'>
-              AI-powered performance insights
+            <p className='text-gray-400 mt-1 text-sm'>
+              AI-powered comprehensive performance insights
             </p>
-
           </div>
         </div>
 
-        <button onClick={downloadPDF} className='bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl shadow-md transition-all duration-300 font-semibold text-sm sm:text-base text-nowrap'>Download PDF</button>
+        <button 
+          onClick={downloadPDF} 
+          className='group flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)] transition-all text-sm font-semibold'
+        >
+          <Download size={16} className="group-hover:-translate-y-1 transition-transform" />
+          Export PDF
+        </button>
       </div>
 
-
-      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8'>
-
+      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 relative z-10'>
         <div className='space-y-6'>
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 text-center">
-
-            <h3 className="text-gray-500 mb-4 sm:mb-6 text-sm sm:text-base">
-              Overall Performance
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card p-8 text-center border-t-4 border-t-accent-primary"
+          >
+            <h3 className="text-gray-400 mb-6 text-sm uppercase tracking-widest font-bold">
+              Overall Rating
             </h3>
-            <div className='relative w-20 h-20 sm:w-25 sm:h-25 mx-auto'>
+            <div className='relative w-32 h-32 mx-auto filter drop-shadow-[0_0_10px_rgba(167,139,250,0.5)]'>
               <CircularProgressbar
                 value={percentage}
-                text={`${score}/10`}
+                text={`${finalScore}/10`}
                 styles={buildStyles({
-                  textSize: "18px",
-                  pathColor: "#10b981",
-                  textColor: "#ef4444",
-                  trailColor: "#e5e7eb",
+                  textSize: "24px",
+                  pathColor: "#A78BFA",
+                  textColor: "#fff",
+                  trailColor: "rgba(255,255,255,0.1)",
                 })}
               />
             </div>
-
-            <p className="text-gray-400 mt-3 text-xs sm:text-sm">
-              Out of 10
-            </p>
-
-            <div className="mt-4">
-              <p className="font-semibold text-gray-800 text-sm sm:text-base">
+            <div className="mt-8">
+              <p className="font-bold text-white text-xl">
                 {performanceText}
               </p>
-              <p className="text-gray-500 text-xs sm:text-sm mt-1">
+              <p className="text-accent-primary text-sm mt-2 font-medium bg-accent-primary/10 py-2 px-4 rounded-lg inline-block">
                 {shortTagline}
               </p>
             </div>
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className='bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8'>
-            <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-6">
-              Skill Evaluation
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className='glass-card p-8'
+          >
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">
+              Skill Metrics
             </h3>
-
-            <div className='space-y-5'>
-              {
-                skills.map((s, i) => (
-                  <div key={i}>
-                    <div className='flex justify-between mb-2 text-sm sm:text-base'>
-
-                      <span>{s.label}</span>
-                      <span className='font-semibold text-green-600'>{s.value}</span>
-                    </div>
-
-                    <div className='bg-gray-200 h-2 sm:h-3 rounded-full'>
-                      <div className='bg-green-500 h-full rounded-full'
-                        style={{ width: `${s.value * 10}%` }}
-
-                      ></div>
-
-                    </div>
-
-
+            <div className='space-y-6'>
+              {skills.map((s, i) => (
+                <div key={i}>
+                  <div className='flex justify-between mb-2 text-sm'>
+                    <span className="text-gray-300 font-medium">{s.label}</span>
+                    <span className='font-bold text-accent-tertiary'>{s.value}/10</span>
                   </div>
-                ))
-              }
+                  <div className='bg-white/5 h-2 rounded-full overflow-hidden'>
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(s.value ?? 0) * 10}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                      className='bg-gradient-to-r from-accent-primary to-accent-secondary h-full rounded-full'
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-
           </motion.div>
 
-
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className='glass-card p-6 h-64'
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                <Radar name="Skills" dataKey="A" stroke="#A78BFA" fill="#A78BFA" fillOpacity={0.3} />
+                <Tooltip contentStyle={{ backgroundColor: '#0B1120', borderColor: 'rgba(255,255,255,0.1)' }} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </motion.div>
         </div>
 
         <div className='lg:col-span-2 space-y-6'>
-
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className='bg-white rounded-2xl sm:rounded-3xl shadow-lg p-5 sm:p-8'>
-            <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-4 sm:mb-6">
-              Performance Trend
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className='glass-card p-6 md:p-8'
+          >
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">
+              Score Timeline
             </h3>
-
-            <div className='h-64 sm:h-72'>
-
+            <div className='h-64 sm:h-80 w-full'>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={questionScoreData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis domain={[0, 10]} />
-                  <Tooltip />
-                  <Area type="monotone"
+                <AreaChart data={questionScoreData} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#A78BFA" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#A78BFA" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="name" stroke="#6b7280" tick={{fill: '#6b7280'}} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 10]} stroke="#6b7280" tick={{fill: '#6b7280'}} axisLine={false} tickLine={false} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0B1120', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }} 
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Area 
+                    type="monotone"
                     dataKey="score"
-                    stroke="#22c55e"
-                    fill="#bbf7d0"
-                    strokeWidth={3} />
-
-
+                    stroke="#A78BFA"
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorScore)" 
+                  />
                 </AreaChart>
-
               </ResponsiveContainer>
-
-
             </div>
-
-
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className='bg-white rounded-2xl sm:rounded-3xl shadow-lg p-5 sm:p-8'>
-            <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-6">
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className='glass-card p-6 md:p-8'
+          >
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">
               Question Breakdown
             </h3>
             <div className='space-y-6'>
               {questionWiseScore.map((q, i) => (
-                <div key={i} className='bg-gray-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-gray-200'>
-
-                  <div className='flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4'>
-                    <div>
-                      <p className="text-xs text-gray-400">
+                <div key={i} className='bg-white/5 p-6 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-white/10 transition-colors'>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-accent-secondary tracking-widest uppercase mb-2">
                         Question {i + 1}
                       </p>
-
-                      <p className="font-semibold text-gray-800 text-sm sm:text-base leading-relaxed">
-                        {q.question || "Question not available"}
+                      <p className="font-semibold text-white text-base leading-relaxed">
+                        {q?.question || "Question not available"}
                       </p>
                     </div>
-
-
-                    <div className='bg-green-100 text-green-600 px-3 py-1 rounded-full font-bold text-xs sm:text-sm w-fit'>
-                      {q.score ?? 0}/10
+                    <div className='bg-accent-tertiary/10 text-accent-tertiary border border-accent-tertiary/20 px-4 py-1.5 rounded-full font-bold text-sm shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.2)]'>
+                      {q?.score ?? 0}/10
                     </div>
                   </div>
 
-                  <div className='bg-green-50 border border-green-200 p-4 rounded-lg'>
-                    <p className='text-xs text-green-600 font-semibold mb-1'>
-                      AI Feedback
+                  <div className='bg-white/5 border border-white/10 p-5 rounded-xl backdrop-blur-sm relative z-10'>
+                    <p className='text-xs text-accent-primary font-bold uppercase tracking-wider mb-2 flex items-center gap-2'>
+                      <BrainCircuit size={14} /> AI Analysis
                     </p>
-                    <p className='text-sm text-gray-700 leading-relaxed'>
-
-                      {q.feedback && q.feedback.trim() !== ""
-                        ? q.feedback
-                        : "No feedback available for this question."}
+                    <p className='text-sm text-gray-300 leading-relaxed'>
+                      {q?.feedback?.trim() ? q.feedback : "No feedback available for this question."}
                     </p>
                   </div>
-                  {q.questionType === 'coding' && q.codeSnippet && (
-                    <div className="bg-gray-900 text-green-400 p-4 rounded-lg mt-4 font-mono text-sm overflow-x-auto whitespace-pre-wrap">
-                      <p className="text-xs text-gray-400 mb-2 font-sans">Submitted Code:</p>
-                      {q.codeSnippet}
+
+                  {q?.questionType === 'coding' && q?.codeSnippet && (
+                    <div className="bg-[#1e1e1e] border border-white/10 p-5 rounded-xl mt-4 font-mono text-sm overflow-x-auto whitespace-pre-wrap relative z-10">
+                      <p className="text-xs text-gray-500 mb-3 font-sans font-bold uppercase tracking-wider flex items-center gap-2">
+                        <Code2 size={14} /> Code Submission
+                      </p>
+                      <span className="text-gray-300">{q.codeSnippet}</span>
                     </div>
                   )}
-                  {q.body_language_feedback ? (
-                    <div className='mt-3 bg-indigo-50 border border-indigo-200 p-4 rounded-lg flex items-start gap-3'>
-                      <div className='text-indigo-600 mt-0.5'>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                        </svg>
+
+                  {q?.body_language_feedback ? (
+                    <div className='mt-4 bg-accent-secondary/10 border border-accent-secondary/20 p-5 rounded-xl flex items-start gap-4 relative z-10'>
+                      <div className='text-accent-secondary mt-0.5 shrink-0 bg-accent-secondary/20 p-2 rounded-lg'>
+                        <Activity size={18} />
                       </div>
                       <div>
-                        <p className='text-xs text-indigo-600 font-semibold mb-1'>
-                          Body Language & Pacing
+                        <p className='text-xs text-accent-secondary font-bold uppercase tracking-wider mb-1'>
+                          Behavioral Metrics
                         </p>
-                        <p className='text-sm text-gray-700 leading-relaxed'>
+                        <p className='text-sm text-gray-300 leading-relaxed'>
                           {q.body_language_feedback}
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <div className='mt-3 bg-gray-100 border border-gray-200 p-4 rounded-lg flex items-start gap-3'>
-                      <div className='text-gray-400 mt-0.5'>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
-                        </svg>
+                    <div className='mt-4 bg-white/5 border border-white/5 p-5 rounded-xl flex items-start gap-4 relative z-10 opacity-70'>
+                      <div className='text-gray-500 mt-0.5 shrink-0 bg-white/5 p-2 rounded-lg'>
+                        <Video size={18} />
                       </div>
                       <div>
-                        <p className='text-xs text-gray-500 font-semibold mb-1'>
-                          Body Language & Pacing
+                        <p className='text-xs text-gray-500 font-bold uppercase tracking-wider mb-1'>
+                          Behavioral Metrics
                         </p>
-                        <p className='text-sm text-gray-500 leading-relaxed italic'>
-                          Analytics Paused (Camera was likely turned off)
+                        <p className='text-sm text-gray-400 leading-relaxed italic'>
+                          Analytics unavailable (Camera likely disabled)
                         </p>
                       </div>
                     </div>
                   )}
-
                 </div>
               ))}
             </div>
-
           </motion.div>
-
-
-
-
-
         </div>
       </div>
-
     </div>
-  )
+  );
 }
 
-export default Step3Report
+export default Step3Report;

@@ -1,18 +1,17 @@
-import React from 'react'
-import maleVideo from "../assets/videos/male-ai.mp4"
-import femaleVideo from "../assets/videos/female-ai.mp4"
-import Timer from './Timer'
-import { motion } from "motion/react"
-import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash } from "react-icons/fa";
-import { useState } from 'react'
-import { useRef } from 'react'
-import { useEffect } from 'react'
-import axios from "axios"
-import { ServerUrl } from '../App'
-import { BsArrowRight } from 'react-icons/bs'
-import * as faceapi from 'face-api.js'
-import toast from 'react-hot-toast'
-import { Editor } from "@monaco-editor/react";
+import React, { useState, useRef, useEffect } from 'react';
+import maleVideo from "../assets/videos/male-ai.mp4";
+import femaleVideo from "../assets/videos/female-ai.mp4";
+import Timer from './Timer';
+import { motion, AnimatePresence } from "motion/react";
+import { Mic, MicOff, Video, VideoOff, Send, ArrowRight, Brain, Eye, Activity, Smile, Frown, Meh, Cpu } from "lucide-react";
+import axios from "axios";
+import { ServerUrl } from '../App';
+import * as faceapi from 'face-api.js';
+import toast from 'react-hot-toast';
+
+import InterviewEditor, { BOILERPLATES, PISTON_LANGUAGES } from './InterviewEditor';
+import InterviewTerminal from './InterviewTerminal';
+
 function Step2Interview({ interviewData, onFinish }) {
   const { interviewId, questions, userName } = interviewData;
   const [isIntroPhase, setIsIntroPhase] = useState(true);
@@ -24,10 +23,16 @@ function Step2Interview({ interviewData, onFinish }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [codeAnswer, setCodeAnswer] = useState("");
+  const [language, setLanguage] = useState("cpp");
+  
+  // Piston Execution State
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [terminalOutput, setTerminalOutput] = useState("");
+  const [terminalError, setTerminalError] = useState("");
+  const [runStats, setRunStats] = useState(null);
+
   const [feedback, setFeedback] = useState("");
-  const [timeLeft, setTimeLeft] = useState(
-    questions[0]?.timeLimit || 60
-  );
+  const [timeLeft, setTimeLeft] = useState(questions[0]?.timeLimit || 60);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voiceGender, setVoiceGender] = useState("female");
@@ -35,27 +40,29 @@ function Step2Interview({ interviewData, onFinish }) {
   const [isCameraVisible, setIsCameraVisible] = useState(true);
 
   const [emotionTally, setEmotionTally] = useState({ happy: 0, neutral: 0, nervous: 0 });
+  const [currentEmotion, setCurrentEmotion] = useState("neutral");
+  
   const webcamRef = useRef(null);
   const webcamStreamRef = useRef(null);
   const faceIntervalRef = useRef(null);
-
   const videoRef = useRef(null);
 
   const currentQuestion = questions[currentIndex];
 
+  useEffect(() => {
+    setCodeAnswer(BOILERPLATES[language]);
+  }, []);
 
   useEffect(() => {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
       if (!voices.length) return;
 
-      // Try known female voices first
-      const femaleVoice =
-        voices.find(v =>
-          v.name.toLowerCase().includes("zira") ||
-          v.name.toLowerCase().includes("samantha") ||
-          v.name.toLowerCase().includes("female")
-        );
+      const femaleVoice = voices.find(v =>
+        v.name.toLowerCase().includes("zira") ||
+        v.name.toLowerCase().includes("samantha") ||
+        v.name.toLowerCase().includes("female")
+      );
 
       if (femaleVoice) {
         setSelectedVoice(femaleVoice);
@@ -63,13 +70,11 @@ function Step2Interview({ interviewData, onFinish }) {
         return;
       }
 
-      // Try known male voices
-      const maleVoice =
-        voices.find(v =>
-          v.name.toLowerCase().includes("david") ||
-          v.name.toLowerCase().includes("mark") ||
-          v.name.toLowerCase().includes("male")
-        );
+      const maleVoice = voices.find(v =>
+        v.name.toLowerCase().includes("david") ||
+        v.name.toLowerCase().includes("mark") ||
+        v.name.toLowerCase().includes("male")
+      );
 
       if (maleVoice) {
         setSelectedVoice(maleVoice);
@@ -77,16 +82,13 @@ function Step2Interview({ interviewData, onFinish }) {
         return;
       }
 
-      // Fallback: first voice (assume female)
       setSelectedVoice(voices[0]);
       setVoiceGender("female");
     };
 
     loadVoices();
-    loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
-
-  }, [])
+  }, []);
 
   // Load face-api.js models ONCE
   useEffect(() => {
@@ -101,7 +103,7 @@ function Step2Interview({ interviewData, onFinish }) {
     loadModels();
   }, []);
 
-  // Webcam Logic (depends on isCameraVisible)
+  // Webcam Logic (with strict cleanup)
   useEffect(() => {
     let activeStream = null;
 
@@ -130,6 +132,15 @@ function Step2Interview({ interviewData, onFinish }) {
     };
   }, [isCameraVisible]);
 
+  // Global unmount cleanup for webcam (route changes)
+  useEffect(() => {
+    return () => {
+      if (webcamStreamRef.current) {
+        webcamStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
   // Face Tracking Logic
   useEffect(() => {
     if (isMicOn && isCameraVisible && !isIntroPhase) {
@@ -152,6 +163,8 @@ function Step2Interview({ interviewData, onFinish }) {
                 }
               }
               
+              setCurrentEmotion(dominantEmotion);
+
               setEmotionTally(prev => {
                 const updated = { ...prev };
                 if (dominantEmotion === 'happy' || dominantEmotion === 'surprised') updated.happy += 1;
@@ -176,8 +189,6 @@ function Step2Interview({ interviewData, onFinish }) {
 
   const videoSource = voiceGender === "male" ? maleVideo : femaleVideo;
 
-
-  /* ---------------- SPEAK FUNCTION ---------------- */
   const speakText = (text) => {
     return new Promise((resolve) => {
       if (!window.speechSynthesis || !selectedVoice) {
@@ -187,115 +198,74 @@ function Step2Interview({ interviewData, onFinish }) {
 
       window.speechSynthesis.cancel();
 
-      // Add natural pauses after commas and periods
-      const humanText = text
-        .replace(/,/g, ", ... ")
-        .replace(/\./g, ". ... ");
-
+      const humanText = text.replace(/,/g, ", ... ").replace(/\./g, ". ... ");
       const utterance = new SpeechSynthesisUtterance(humanText);
-
       utterance.voice = selectedVoice;
-
-      // Human-like pacing
-      utterance.rate = 0.92;     // slightly slower than normal
-      utterance.pitch = 1.05;    // small warmth
+      utterance.rate = 0.92;     
+      utterance.pitch = 1.05;    
       utterance.volume = 1;
 
       utterance.onstart = () => {
         setIsAIPlaying(true);
-        stopMic()
+        stopMic();
         videoRef.current?.play();
       };
-
 
       utterance.onend = () => {
         videoRef.current?.pause();
         videoRef.current.currentTime = 0;
         setIsAIPlaying(false);
-
-
-
-        if (isMicOn) {
-          startMic();
-        }
+        if (isMicOn) startMic();
         setTimeout(() => {
           setSubtitle("");
           resolve();
         }, 300);
       };
 
-
       setSubtitle(text);
-
       window.speechSynthesis.speak(utterance);
     });
   };
 
-
   useEffect(() => {
-    if (!selectedVoice) {
-      return;
-    }
+    if (!selectedVoice) return;
     const runIntro = async () => {
       if (isIntroPhase) {
-        await speakText(
-          `Hi ${userName}, it's great to meet you today. I hope you're feeling confident and ready.`
-        );
-
-        await speakText(
-          "I'll ask you a few questions. Just answer naturally, and take your time. Let's begin."
-        );
-
-        setIsIntroPhase(false)
+        await speakText(`Hi ${userName}, it's great to meet you today. I hope you're feeling confident and ready.`);
+        await speakText("I'll ask you a few questions. Just answer naturally, and take your time. Let's begin.");
+        setIsIntroPhase(false);
       } else if (currentQuestion) {
         await new Promise(r => setTimeout(r, 800));
-
-        // If last question (hard level)
         if (currentIndex === questions.length - 1) {
           await speakText("Alright, this one might be a bit more challenging.");
         }
-
         await speakText(currentQuestion.question);
-
-        if (isMicOn) {
-          startMic();
-        }
+        if (isMicOn) startMic();
       }
-
     }
-
-    runIntro()
-
-
-  }, [selectedVoice, isIntroPhase, currentIndex])
-
-
+    runIntro();
+  }, [selectedVoice, isIntroPhase, currentIndex]);
 
   useEffect(() => {
     if (isIntroPhase) return;
     if (!currentQuestion) return;
-    
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(timer)
+          clearInterval(timer);
           return 0;
         }
-        return prev - 1
-
-      })
+        return prev - 1;
+      });
     }, 1000);
-
-    return () => clearInterval(timer)
-
-  }, [isIntroPhase, currentIndex])
+    return () => clearInterval(timer);
+  }, [isIntroPhase, currentIndex]);
 
   useEffect(() => {
-  if (!isIntroPhase && currentQuestion) {
-    setTimeLeft(currentQuestion.timeLimit || 60);
-  }
-}, [currentIndex]);
-
+    if (!isIntroPhase && currentQuestion) {
+      setTimeLeft(currentQuestion.timeLimit || 60);
+    }
+  }, [currentIndex]);
 
   useEffect(() => {
     if (!("webkitSpeechRecognition" in window)) return;
@@ -306,22 +276,16 @@ function Step2Interview({ interviewData, onFinish }) {
     recognition.interimResults = false;
 
     recognition.onresult = (event) => {
-      const transcript =
-        event.results[event.results.length - 1][0].transcript;
-
+      const transcript = event.results[event.results.length - 1][0].transcript;
       setAnswer((prev) => prev + " " + transcript);
     };
 
     recognitionRef.current = recognition;
-
   }, []);
-
 
   const startMic = () => {
     if (recognitionRef.current && !isAIPlaying) {
-      try {
-        recognitionRef.current.start();
-      } catch { }
+      try { recognitionRef.current.start(); } catch {}
     }
   };
 
@@ -330,28 +294,25 @@ function Step2Interview({ interviewData, onFinish }) {
       recognitionRef.current.stop();
     }
   };
+
   const toggleMic = () => {
-    if (isMicOn) {
-      stopMic();
-    } else {
-      startMic();
-    }
+    if (isMicOn) stopMic();
+    else startMic();
     setIsMicOn(!isMicOn);
   };
 
-
   const submitAnswer = async () => {
     if (isSubmitting) return;
-    stopMic()
-    setIsSubmitting(true)
+    stopMic();
+    setIsSubmitting(true);
 
     try {
       const timeElapsed = currentQuestion.timeLimit - timeLeft || 1;
       const wordCount = answer.trim().split(/\s+/).filter(w => w.length > 0).length;
       const wpm = (wordCount / timeElapsed) * 60;
-      
       const behavioralTelemetry = { emotionTally, wpm: Math.round(wpm) };
 
+      // Send the codeSnippet to backend for AI Evaluation
       const result = await axios.post(ServerUrl + "/api/interview/submit-answer", {
         interviewId,
         questionIndex: currentIndex,
@@ -359,20 +320,22 @@ function Step2Interview({ interviewData, onFinish }) {
         codeSnippet: codeAnswer,
         timeTaken: timeElapsed,
         behavioralTelemetry
-      } , {withCredentials:true})
+      }, { withCredentials: true });
 
-      setFeedback(result.data.feedback)
-      speakText(result.data.feedback)
-      setIsSubmitting(false)
+      setFeedback(result.data.feedback);
+      speakText(result.data.feedback);
+      setIsSubmitting(false);
     } catch (error) {
-console.log(error)
-setIsSubmitting(false)
+      console.log(error);
+      setIsSubmitting(false);
     }
-  }
+  };
 
-  const handleNext =async () => {
+  const handleNext = async () => {
     setAnswer("");
-    setCodeAnswer("");
+    setCodeAnswer(BOILERPLATES[language]);
+    setTerminalOutput("");
+    setTerminalError("");
     setFeedback("");
 
     if (currentIndex + 1 >= questions.length) {
@@ -381,36 +344,26 @@ setIsSubmitting(false)
     }
 
     await speakText("Alright, let's move to the next question.");
-
     setCurrentIndex(currentIndex + 1);
-    setTimeout(() => {
-      if (isMicOn) startMic();
-    }, 500);
-
-   
-  }
+    setTimeout(() => { if (isMicOn) startMic(); }, 500);
+  };
 
   const finishInterview = async () => {
-    stopMic()
-    setIsMicOn(false)
+    stopMic();
+    setIsMicOn(false);
     try {
-      const result = await axios.post(ServerUrl+ "/api/interview/finish" , { interviewId} , {withCredentials:true})
-
-      toast.success("Interview completed! Generating report...")
-      console.log(result.data)
-      onFinish(result.data)
+      const result = await axios.post(ServerUrl + "/api/interview/finish", { interviewId }, { withCredentials: true });
+      toast.success("Interview completed! Generating report...");
+      onFinish(result.data);
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
-  }
+  };
 
-
-   useEffect(() => {
-    if (isIntroPhase) return;
-    if (!currentQuestion) return;
-
+  useEffect(() => {
+    if (isIntroPhase || !currentQuestion) return;
     if (timeLeft === 0 && !isSubmitting && !feedback) {
-      submitAnswer()
+      submitAnswer();
     }
   }, [timeLeft]);
 
@@ -420,183 +373,266 @@ setIsSubmitting(false)
         recognitionRef.current.stop();
         recognitionRef.current.abort();
       }
-
       window.speechSynthesis.cancel();
     };
   }, []);
 
+  // Piston API Execution
+  const handleRunCode = async () => {
+    setIsExecuting(true);
+    setTerminalOutput("");
+    setTerminalError("");
+    setRunStats(null);
 
+    try {
+      const pistonConfig = PISTON_LANGUAGES[language];
+      const response = await fetch("https://emkc.org/api/v2/piston/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language: pistonConfig.language,
+          version: pistonConfig.version,
+          files: [{ content: codeAnswer }],
+        }),
+      });
 
+      const data = await response.json();
+      
+      if (data.run.stderr || data.compile?.stderr) {
+        setTerminalError(data.run.stderr || data.compile.stderr);
+      } else {
+        setTerminalOutput(data.run.stdout);
+      }
+      
+      setRunStats({ time: data.run.time || 0, memory: data.run.memory || 0 });
+    } catch (error) {
+      setTerminalError("Execution failed. Network error or API limit reached.");
+    } finally {
+      setIsExecuting(false);
+    }
+  };
 
-
-
+  const getEmotionIcon = () => {
+    if (currentEmotion === 'happy' || currentEmotion === 'surprised') return <Smile className="text-emerald-400" size={16}/>;
+    if (currentEmotion === 'neutral') return <Meh className="text-blue-400" size={16}/>;
+    return <Frown className="text-red-400" size={16}/>;
+  };
 
   return (
-    <div className='min-h-screen bg-linear-to-br from-emerald-50 via-white to-teal-100 flex items-center justify-center p-4 sm:p-6'>
-      <div className='w-full max-w-350 min-h-[80vh] bg-white rounded-3xl shadow-2xl border border-gray-200 flex flex-col lg:flex-row overflow-hidden'>
+    <div className='min-h-screen bg-bg-primary p-4 sm:p-6 lg:p-8 flex flex-col gap-6 relative'>
+      {/* Background glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-accent-primary/10 blur-[150px] pointer-events-none" />
 
-        {/* video section */}
-        <div className='w-full lg:w-[35%] bg-white flex flex-col items-center p-6 space-y-6 border-r border-gray-200'>
-          <div className='w-full max-w-md rounded-2xl overflow-hidden shadow-xl relative'>
-            <video
-              src={videoSource}
-              key={videoSource}
-              ref={videoRef}
-              muted
-              playsInline
-              preload="auto"
-              className="w-full h-auto object-cover"
-            />
-            {/* Webcam PiP */}
-            <div className="absolute bottom-6 right-6 w-48 h-36 z-50 group">
-              {isCameraVisible ? (
-                <video
-                  ref={webcamRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full rounded-lg shadow-lg border-2 border-green-500 object-cover bg-black scale-x-[-1]"
-                />
-              ) : (
-                <div className="w-full h-full rounded-lg shadow-lg border-2 border-gray-400 bg-gray-800 flex items-center justify-center">
-                  <FaVideoSlash className="text-gray-400 text-2xl" />
+      {/* Header */}
+      <header className="flex justify-between items-center glass-card px-6 py-3 relative z-10">
+        <div className="flex items-center gap-3">
+          <Brain className="text-accent-primary" size={24} />
+          <h1 className="text-xl font-bold text-white tracking-tight">AI Interview Session</h1>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col items-end">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Progress</span>
+            <span className="text-sm font-bold text-white">{currentIndex + 1} / {questions.length}</span>
+          </div>
+          <div className="h-8 w-px bg-white/10" />
+          <Timer timeLeft={timeLeft} totalTime={currentQuestion?.timeLimit} />
+        </div>
+      </header>
+
+      {/* Main Workspace Layout */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10 min-h-0">
+        
+        {/* Left Column: AI Avatar & Feedback */}
+        <div className="lg:col-span-4 flex flex-col gap-6 min-h-0">
+          
+          {/* Avatar Card */}
+          <div className="glass-card overflow-hidden flex flex-col relative group">
+            <div className="relative w-full aspect-[4/3] bg-black">
+              <video
+                src={videoSource}
+                key={videoSource}
+                ref={videoRef}
+                muted
+                playsInline
+                preload="auto"
+                className="w-full h-full object-cover"
+              />
+              {/* AI Status Indicator */}
+              <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                <div className={`w-2 h-2 rounded-full ${isAIPlaying ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'}`} />
+                <span className="text-xs font-medium text-white">{isAIPlaying ? 'AI Speaking' : 'AI Listening'}</span>
+              </div>
+
+              {/* Emotion HUD */}
+              {!isIntroPhase && (
+                <div className="absolute top-4 right-4 flex flex-col gap-2">
+                  <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
+                    <Activity size={14} className="text-accent-secondary" />
+                    <span className="text-xs text-white capitalize">{currentEmotion}</span>
+                    {getEmotionIcon()}
+                  </div>
                 </div>
               )}
-              
-              <button
-                onClick={() => setIsCameraVisible(!isCameraVisible)}
-                className="absolute top-1 right-1 bg-black/60 text-white p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
-              >
-                {isCameraVisible ? <FaVideoSlash size={14} /> : <FaVideo size={14} />}
-              </button>
+
+              {/* Webcam PiP */}
+              <div className="absolute bottom-4 right-4 w-32 h-24 z-50">
+                {isCameraVisible ? (
+                  <div className="relative w-full h-full rounded-lg overflow-hidden border border-white/20 shadow-2xl group-hover:glow-border transition-all">
+                    <video
+                      ref={webcamRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover bg-black scale-x-[-1]"
+                    />
+                    {/* Live Mic Indicator in PiP */}
+                    {isMicOn && (
+                      <div className="absolute bottom-1 right-1 bg-black/60 p-1 rounded-md backdrop-blur-sm">
+                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full h-full rounded-lg shadow-lg border border-white/10 bg-gray-900 flex items-center justify-center">
+                    <VideoOff className="text-gray-500" size={20} />
+                  </div>
+                )}
+                <button
+                  onClick={() => setIsCameraVisible(!isCameraVisible)}
+                  className="absolute -top-2 -right-2 bg-gray-800 text-white p-1.5 rounded-full hover:bg-gray-700 transition-colors border border-white/10 shadow-lg"
+                >
+                  {isCameraVisible ? <VideoOff size={12} /> : <Video size={12} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Subtitles Area */}
+            <div className="p-4 bg-bg-secondary min-h-[80px] flex items-center justify-center border-t border-white/5">
+              <AnimatePresence mode="wait">
+                {subtitle ? (
+                  <motion.p
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="text-sm font-medium text-gray-200 text-center leading-relaxed"
+                  >
+                    "{subtitle}"
+                  </motion.p>
+                ) : (
+                  <p className="text-sm text-gray-600 italic">Waiting for response...</p>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
-          {/* subtitle */}
-          {subtitle && (
-            <div className='w-full max-w-md bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm'>
-              <p className='text-gray-700 text-sm sm:text-base font-medium text-center leading-relaxed'>{subtitle}</p>
-            </div>
-          )}
-
-
-          {/* timer Area */}
-          <div className='w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-md p-6 space-y-5'>
-            <div className='flex justify-between items-center'>
-              <span className='text-sm text-gray-500'>
-                Interview Status
-              </span>
-              {isAIPlaying && <span className='text-sm font-semibold text-emerald-600'>
-                {isAIPlaying ? "AI Speaking" : ""}
-              </span>}
-            </div>
-
-            <div className="h-px bg-gray-200"></div>
-
-            <div className='flex justify-center'>
-
-              <Timer timeLeft={timeLeft} totalTime={currentQuestion?.timeLimit} />
-            </div>
-
-            <div className="h-px bg-gray-200"></div>
-
-            <div className='grid grid-cols-2 gap-6 text-center'>
-              <div>
-                <span className='text-2xl font-bold text-emerald-600'>{currentIndex + 1}</span>
-                <span className='text-xs text-gray-400'>Current Questions</span>
+          {/* Controls & Voice Input */}
+          <div className="glass-card p-6 flex flex-col gap-4">
+             <div className="flex items-center gap-4">
+               <motion.button
+                onClick={toggleMic}
+                whileTap={{ scale: 0.95 }}
+                className={`w-14 h-14 flex items-center justify-center rounded-2xl shadow-lg border transition-colors ${
+                  isMicOn 
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 hover:bg-emerald-500/30 glow-border' 
+                    : 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20'
+                }`}
+              >
+                {isMicOn ? <Mic size={24} /> : <MicOff size={24} />}
+              </motion.button>
+              
+              <div className="flex-1 bg-black/40 rounded-xl p-4 border border-white/5 h-32 overflow-y-auto custom-scrollbar relative">
+                {!answer && <span className="text-gray-600 italic text-sm absolute top-4 left-4 pointer-events-none">Speech recognized text will appear here...</span>}
+                <p className="text-sm text-gray-300 leading-relaxed">{answer}</p>
               </div>
+             </div>
 
-              <div>
-                <span className='text-2xl font-bold text-emerald-600'>{questions.length}</span>
-                <span className='text-xs text-gray-400'>Total Questions</span>
-              </div>
-            </div>
-
-
+             {!feedback ? (
+              <motion.button
+                onClick={submitAnswer}
+                disabled={isSubmitting}
+                whileTap={{ scale: 0.98 }}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-primary to-accent-secondary text-white py-3.5 rounded-xl font-semibold shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] transition-all disabled:opacity-50"
+              >
+                {isSubmitting ? "Evaluating..." : "Submit Answer"}
+                <Send size={16} />
+              </motion.button>
+             ) : (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full flex flex-col gap-3"
+              >
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 text-sm leading-relaxed custom-scrollbar max-h-40 overflow-y-auto">
+                  {feedback}
+                </div>
+                <button
+                  onClick={handleNext}
+                  className="w-full flex items-center justify-center gap-2 bg-white text-black py-3.5 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                >
+                  Next Question <ArrowRight size={16}/>
+                </button>
+              </motion.div>
+             )}
           </div>
         </div>
 
-        {/* Text section */}
+        {/* Right Column: Question, Editor & Terminal */}
+        <div className="lg:col-span-8 flex flex-col gap-6 min-h-0">
+          
+          {/* Question Panel */}
+          <div className="glass-card p-6 border-l-4 border-l-accent-primary flex-shrink-0">
+            <h3 className="text-sm font-bold text-accent-secondary uppercase tracking-wider mb-2">Current Question</h3>
+            {isIntroPhase ? (
+               <p className="text-lg text-gray-400 animate-pulse">Initializing interview...</p>
+            ) : (
+               <p className="text-lg md:text-xl font-semibold text-white leading-relaxed">{currentQuestion?.question}</p>
+            )}
+          </div>
 
-        <div className='flex-1 flex flex-col p-4 sm:p-6 md:p-8 relative'>
-          <h2 className='text-xl sm:text-2xl font-bold text-emerald-600 mb-6'>
-            AI Smart Interview
-          </h2>
-
-
-          {!isIntroPhase && (<div className='relative mb-6 bg-gray-50 p-4 sm:p-6 rounded-2xl border border-gray-200 shadow-sm'>
-            <p className='text-xs sm:text-sm text-gray-400 mb-2'>
-              Question {currentIndex + 1} of {questions.length}
-            </p>
-
-            <div className='text-base sm:text-lg font-semibold text-gray-800 leading-relaxed '>{currentQuestion?.question}</div>
-          </div>)
-          }
+          {/* IDE Area (Editor + Terminal) */}
           {currentQuestion?.questionType === 'coding' ? (
-            <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-[300px]">
-              <textarea
-                placeholder="Explain your logic here while typing..."
-                onChange={(e) => setAnswer(e.target.value)}
-                value={answer}
-                className="flex-[0.4] bg-gray-100 p-4 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 transition text-gray-800" />
-              <div className="flex-[0.6] rounded-2xl overflow-hidden border border-gray-200">
-                <Editor
-                  height="100%"
-                  defaultLanguage="cpp"
-                  theme="vs-dark"
-                  value={codeAnswer}
-                  onChange={(val) => setCodeAnswer(val || "")}
-                  options={{ minimap: { enabled: false } }}
+            <div className="flex-1 flex flex-col gap-6 min-h-0">
+              {/* Editor Pane */}
+              <div className="flex-[0.7] min-h-[300px]">
+                <InterviewEditor 
+                  codeAnswer={codeAnswer} 
+                  setCodeAnswer={setCodeAnswer}
+                  language={language}
+                  setLanguage={setLanguage}
+                  onRunCode={handleRunCode}
+                  isExecuting={isExecuting}
+                />
+              </div>
+              
+              {/* Terminal Pane */}
+              <div className="flex-[0.3] min-h-[150px]">
+                <InterviewTerminal 
+                  output={terminalOutput}
+                  error={terminalError}
+                  isExecuting={isExecuting}
+                  runStats={runStats}
                 />
               </div>
             </div>
           ) : (
-            <textarea
-              placeholder="Type your answer here..."
-              onChange={(e) => setAnswer(e.target.value)}
-              value={answer}
-              className="flex-1 bg-gray-100 p-4 sm:p-6 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 transition text-gray-800" />
+            <div className="flex-1 glass-card p-6 flex flex-col relative overflow-hidden">
+               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none" />
+               <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
+                 <Eye size={16}/> Behavioral Focus Mode
+               </h3>
+               <textarea
+                  placeholder="Alternatively, type your thoughts here..."
+                  onChange={(e) => setAnswer(e.target.value)}
+                  value={answer}
+                  className="flex-1 bg-black/40 border border-white/10 rounded-xl p-4 text-gray-200 resize-none outline-none focus:border-accent-primary/50 transition-colors custom-scrollbar relative z-10"
+               />
+            </div>
           )}
 
-
-         {!feedback ? ( <div className='flex items-center gap-4 mt-6'>
-            <motion.button
-              onClick={toggleMic}
-              whileTap={{ scale: 0.9 }}
-              className='w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full bg-black text-white shadow-lg'>
-              {isMicOn ? <FaMicrophone size={20} /> : <FaMicrophoneSlash size={20}/>}
-            </motion.button>
-
-            <motion.button
-            onClick={submitAnswer}
-            disabled={isSubmitting}
-              whileTap={{ scale: 0.95 }}
-              className='flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 text-white py-3 sm:py-4 rounded-2xl shadow-lg hover:opacity-90 transition font-semibold disabled:bg-gray-500'>
-              {isSubmitting?"Submitting...":"Submit Answer"}
-
-            </motion.button>
-
-          </div>):(
-            <motion.div 
-             initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            className='mt-6 bg-emerald-50 border border-emerald-200 p-5 rounded-2xl shadow-sm'>
-              <p className='text-emerald-700 font-medium mb-4'>{feedback}</p>
-
-              <button
-              onClick={handleNext}
-
-               className='w-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white py-3 rounded-xl shadow-md hover:opacity-90 transition flex items-center justify-center gap-1'>
-                Next Question <BsArrowRight size={18}/>
-              </button>
-
-            </motion.div>
-          )}
         </div>
       </div>
-
     </div>
-  )
+  );
 }
 
-export default Step2Interview
+export default Step2Interview;
