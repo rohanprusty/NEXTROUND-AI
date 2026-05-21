@@ -10,6 +10,7 @@ import { ServerUrl } from '../App';
 import { useDispatch } from 'react-redux';
 import { setUserData } from '../redux/userSlice';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 function Auth({isModel = false}) {
     const dispatch = useDispatch()
@@ -24,6 +25,7 @@ function Auth({isModel = false}) {
             const result = await axios.post(ServerUrl + "/api/auth/google" , {name , email} , {withCredentials:true})
             dispatch(setUserData(result.data))
             
+            toast.success("Successfully logged in!", { duration: 2000 })
             navigate('/interview')
             
 

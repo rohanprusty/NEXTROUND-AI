@@ -11,6 +11,7 @@ import axios from "axios"
 import { ServerUrl } from '../App'
 import { BsArrowRight } from 'react-icons/bs'
 import * as faceapi from 'face-api.js'
+import toast from 'react-hot-toast'
 function Step2Interview({ interviewData, onFinish }) {
   const { interviewId, questions, userName } = interviewData;
   const [isIntroPhase, setIsIntroPhase] = useState(true);
@@ -391,6 +392,7 @@ setIsSubmitting(false)
     try {
       const result = await axios.post(ServerUrl+ "/api/interview/finish" , { interviewId} , {withCredentials:true})
 
+      toast.success("Interview completed! Generating report...")
       console.log(result.data)
       onFinish(result.data)
     } catch (error) {

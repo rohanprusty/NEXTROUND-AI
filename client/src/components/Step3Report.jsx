@@ -7,6 +7,7 @@ import 'react-circular-progressbar/dist/styles.css';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import toast from "react-hot-toast"
 
 function Step3Report({ report }) {
   if (!report) {
@@ -54,7 +55,13 @@ function Step3Report({ report }) {
   const percentage = (score / 10) * 100;
 
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
+  const toastId = toast.loading("Generating PDF Report...");
+
+  // Small delay so the toast can render before sync blocking PDF gen
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  try {
   const doc = new jsPDF("p", "mm", "a4");
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -169,6 +176,11 @@ function Step3Report({ report }) {
 
 
   doc.save("AI_Interview_Report.pdf");
+  
+  toast.success("PDF Report downloaded successfully!", { id: toastId });
+  } catch (error) {
+    toast.error("Failed to generate PDF.", { id: toastId });
+  }
 };
 
   return (
