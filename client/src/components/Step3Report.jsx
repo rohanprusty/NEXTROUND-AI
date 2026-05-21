@@ -80,7 +80,7 @@ function Step3Report({ report }) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(22);
       doc.setTextColor(255, 255, 255);
-      doc.text("InterviewForge AI Report", pageWidth / 2, 25, { align: "center" });
+      doc.text("NextRound AI Report", pageWidth / 2, 25, { align: "center" });
 
       currentY = 55;
 

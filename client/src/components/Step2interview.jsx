@@ -21,7 +21,8 @@ function Step2Interview({ interviewData, onFinish }) {
   const [isAIPlaying, setIsAIPlaying] = useState(false);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answer, setAnswer] = useState("");
+  const [transcript, setTranscript] = useState("");
+  const [interimTranscript, setInterimTranscript] = useState("");
   const [codeAnswer, setCodeAnswer] = useState("");
   const [language, setLanguage] = useState("cpp");
   
@@ -273,11 +274,27 @@ function Step2Interview({ interviewData, onFinish }) {
     const recognition = new window.webkitSpeechRecognition();
     recognition.lang = "en-US";
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
 
     recognition.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript;
-      setAnswer((prev) => prev + " " + transcript);
+      let interim = "";
+      let final = "";
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+
+      if (final) {
+        setTranscript((prev) => {
+          const base = prev.trimEnd();
+          return base + (base ? " " : "") + final.trimStart();
+        });
+      }
+      setInterimTranscript(interim);
     };
 
     recognitionRef.current = recognition;
@@ -308,7 +325,8 @@ function Step2Interview({ interviewData, onFinish }) {
 
     try {
       const timeElapsed = currentQuestion.timeLimit - timeLeft || 1;
-      const wordCount = answer.trim().split(/\s+/).filter(w => w.length > 0).length;
+      const fullAnswer = transcript + (interimTranscript ? " " + interimTranscript : "");
+      const wordCount = fullAnswer.trim().split(/\s+/).filter(w => w.length > 0).length;
       const wpm = (wordCount / timeElapsed) * 60;
       const behavioralTelemetry = { emotionTally, wpm: Math.round(wpm) };
 
@@ -316,7 +334,7 @@ function Step2Interview({ interviewData, onFinish }) {
       const result = await axios.post(ServerUrl + "/api/interview/submit-answer", {
         interviewId,
         questionIndex: currentIndex,
-        answer,
+        answer: fullAnswer,
         codeSnippet: codeAnswer,
         timeTaken: timeElapsed,
         behavioralTelemetry
@@ -332,7 +350,8 @@ function Step2Interview({ interviewData, onFinish }) {
   };
 
   const handleNext = async () => {
-    setAnswer("");
+    setTranscript("");
+    setInterimTranscript("");
     setCodeAnswer(BOILERPLATES[language]);
     setTerminalOutput("");
     setTerminalError("");
@@ -377,18 +396,23 @@ function Step2Interview({ interviewData, onFinish }) {
     };
   }, []);
 
-  // Piston API Execution
   const handleRunCode = async () => {
     setIsExecuting(true);
     setTerminalOutput("");
     setTerminalError("");
     setRunStats(null);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 15000);
+
     try {
       const pistonConfig = PISTON_LANGUAGES[language];
       const response = await fetch("https://emkc.org/api/v2/piston/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           language: pistonConfig.language,
           version: pistonConfig.version,
@@ -397,16 +421,24 @@ function Step2Interview({ interviewData, onFinish }) {
       });
 
       const data = await response.json();
-      
-      if (data.run.stderr || data.compile?.stderr) {
-        setTerminalError(data.run.stderr || data.compile.stderr);
+      clearTimeout(timeoutId);
+
+      if (data.run) {
+        if (data.run.stderr || (data.compile && data.compile.stderr)) {
+          setTerminalError(data.run.stderr || data.compile.stderr);
+        } else {
+          setTerminalOutput(data.run.stdout || data.run.output || "");
+        }
+        setRunStats({ time: data.run.time || 0, memory: data.run.memory || 0 });
       } else {
-        setTerminalOutput(data.run.stdout);
+        setTerminalError(data.message || "Execution failed.");
       }
-      
-      setRunStats({ time: data.run.time || 0, memory: data.run.memory || 0 });
     } catch (error) {
-      setTerminalError("Execution failed. Network error or API limit reached.");
+      if (error.name === "AbortError") {
+        setTerminalError("Execution timeout exceeded (15s limit).");
+      } else {
+        setTerminalError("Failed to connect to Piston API.");
+      }
     } finally {
       setIsExecuting(false);
     }
@@ -540,9 +572,36 @@ function Step2Interview({ interviewData, onFinish }) {
                 {isMicOn ? <Mic size={24} /> : <MicOff size={24} />}
               </motion.button>
               
-              <div className="flex-1 bg-black/40 rounded-xl p-4 border border-white/5 h-32 overflow-y-auto custom-scrollbar relative">
-                {!answer && <span className="text-gray-600 italic text-sm absolute top-4 left-4 pointer-events-none">Speech recognized text will appear here...</span>}
-                <p className="text-sm text-gray-300 leading-relaxed">{answer}</p>
+              <div className="flex-1 bg-black/40 rounded-xl p-3 border border-white/5 h-48 flex flex-col gap-2 relative group focus-within:border-accent-primary/50 focus-within:shadow-[0_0_15px_rgba(139,92,246,0.15)] transition-all">
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center gap-2">
+                    {isMicOn && <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/>}
+                    <span className="text-xs font-semibold text-gray-400">{isMicOn ? "Listening..." : "Paused"}</span>
+                  </div>
+                  <div className="flex gap-3">
+                    <button onClick={() => { setTranscript(""); setInterimTranscript(""); }} className="text-xs text-gray-500 hover:text-white transition-colors">Clear</button>
+                    <button onClick={() => { setTranscript(""); setInterimTranscript(""); if (!isMicOn) toggleMic(); }} className="text-xs text-gray-500 hover:text-white transition-colors">Retry</button>
+                  </div>
+                </div>
+                <div className="flex-1 relative overflow-hidden flex flex-col">
+                  <textarea
+                    value={transcript + (interimTranscript ? (transcript && !transcript.endsWith(' ') ? ' ' : '') + interimTranscript : '')}
+                    onChange={(e) => {
+                      const newVal = e.target.value;
+                      if (interimTranscript && newVal.endsWith(interimTranscript)) {
+                        setTranscript(newVal.slice(0, -interimTranscript.length));
+                      } else {
+                        setTranscript(newVal);
+                        setInterimTranscript("");
+                      }
+                    }}
+                    placeholder="Speech recognized text will appear here..."
+                    className="flex-1 w-full bg-transparent text-sm text-gray-200 resize-none outline-none custom-scrollbar leading-relaxed"
+                  />
+                  <div className="absolute bottom-0 right-0 text-[10px] text-gray-500 bg-black/50 px-2 py-1 rounded-tl-lg pointer-events-none backdrop-blur-sm">
+                     {transcript.length + interimTranscript.length} chars
+                  </div>
+                </div>
               </div>
              </div>
 
@@ -622,8 +681,16 @@ function Step2Interview({ interviewData, onFinish }) {
                </h3>
                <textarea
                   placeholder="Alternatively, type your thoughts here..."
-                  onChange={(e) => setAnswer(e.target.value)}
-                  value={answer}
+                  onChange={(e) => {
+                    const newVal = e.target.value;
+                    if (interimTranscript && newVal.endsWith(interimTranscript)) {
+                      setTranscript(newVal.slice(0, -interimTranscript.length));
+                    } else {
+                      setTranscript(newVal);
+                      setInterimTranscript("");
+                    }
+                  }}
+                  value={transcript + (interimTranscript ? (transcript && !transcript.endsWith(' ') ? ' ' : '') + interimTranscript : '')}
                   className="flex-1 bg-black/40 border border-white/10 rounded-xl p-4 text-gray-200 resize-none outline-none focus:border-accent-primary/50 transition-colors custom-scrollbar relative z-10"
                />
             </div>

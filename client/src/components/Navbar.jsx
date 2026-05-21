@@ -34,19 +34,19 @@ function Navbar() {
                 initial={{ opacity: 0, y: -40 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
-                className='w-full max-w-6xl glass-card px-6 py-3 flex justify-between items-center relative'
+                className='w-full max-w-5xl bg-[#0a0a0a]/70 backdrop-blur-2xl border border-white/5 rounded-full px-5 py-2.5 flex justify-between items-center relative shadow-[0_8px_32px_rgba(0,0,0,0.4)] ring-1 ring-white/5'
             >
                 {/* Logo Section */}
                 <div 
                     onClick={() => navigate('/')} 
                     className='flex items-center gap-3 cursor-pointer group'
                 >
-                    <div className='relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 border border-accent-primary/30 group-hover:glow-border transition-all duration-300'>
-                        <Bot size={20} className="text-accent-primary" />
-                        <div className="absolute inset-0 bg-accent-primary/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className='relative flex items-center justify-center w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 border border-accent-primary/30 group-hover:glow-border transition-all duration-300'>
+                        <img src="/nextRound.png" alt="NextRound AI" className="w-full h-full object-contain" style={{ borderRadius: '50%' }} />
+                        <div className="absolute inset-0 bg-accent-primary/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                     </div>
                     <h1 className='font-bold hidden md:block text-xl tracking-tight text-white'>
-                        InterviewForge<span className="text-gradient">.AI</span>
+                        NextRound<span className="text-gradient"> AI</span>
                     </h1>
                 </div>
 
@@ -61,7 +61,7 @@ function Navbar() {
                     </div>
 
                     {/* Credits Button */}
-                    <div className='relative'>
+                    <div className='relative flex items-center'>
                         <button
                             onClick={() => {
                                 if (!userData) {
@@ -71,31 +71,34 @@ function Navbar() {
                                 setShowCreditPopup(!showCreditPopup);
                                 setShowUserPopup(false);
                             }}
-                            className='flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-full text-sm font-medium hover:bg-white/10 transition-all duration-300'
+                            className='flex items-center gap-2 bg-[#141414] border border-white/10 px-3.5 py-1.5 rounded-full text-sm font-medium hover:bg-[#1a1a1a] hover:border-white/20 transition-all duration-300 shadow-sm'
                         >
-                            <Coins size={16} className="text-accent-tertiary" />
-                            <span className="text-gray-200">{userData?.credits || 0}</span>
+                            <Sparkles size={14} className="text-emerald-400" />
+                            <span className="text-gray-300">{userData?.credits || 0}</span>
                         </button>
 
                         <AnimatePresence>
                             {showCreditPopup && (
                                 <motion.div 
-                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className='absolute right-0 md:right-[-50px] mt-4 w-72 glass-card p-5 z-50'
+                                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                                    transition={{ duration: 0.2, ease: "easeOut" }}
+                                    className='absolute right-0 top-[calc(100%+0.75rem)] w-72 bg-[#0d0d0d]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.7)] ring-1 ring-white/5 z-50 flex flex-col gap-3'
                                 >
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Sparkles size={16} className="text-accent-primary" />
-                                        <h3 className="font-semibold text-white">Pro Credits</h3>
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                                            <Sparkles size={14} className="text-emerald-400" />
+                                        </div>
+                                        <h3 className="font-semibold text-gray-200 text-sm">Pro Credits</h3>
                                     </div>
-                                    <p className='text-sm text-gray-400 mb-4 leading-relaxed'>Unlock more AI interview sessions and advanced analytics.</p>
+                                    <p className='text-[13px] text-gray-400 leading-relaxed'>Unlock more AI interview sessions and advanced analytics.</p>
                                     <button 
                                         onClick={() => {
                                             setShowCreditPopup(false);
                                             navigate("/pricing");
                                         }} 
-                                        className='w-full bg-gradient-to-r from-accent-primary to-accent-secondary text-white py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-[0_0_15px_rgba(167,139,250,0.4)]'
+                                        className='w-full bg-white text-black py-2.5 rounded-xl text-[13px] font-semibold hover:bg-gray-200 transition-colors mt-1 shadow-sm'
                                     >
                                         Upgrade Plan
                                     </button>
@@ -105,7 +108,7 @@ function Navbar() {
                     </div>
 
                     {/* User Profile */}
-                    <div className='relative'>
+                    <div className='relative flex items-center'>
                         <button
                             onClick={() => {
                                 if (!userData) {
@@ -115,38 +118,42 @@ function Navbar() {
                                 setShowUserPopup(!showUserPopup);
                                 setShowCreditPopup(false);
                             }}
-                            className='w-10 h-10 bg-gradient-to-br from-gray-800 to-gray-900 border border-white/10 text-white rounded-full flex items-center justify-center font-semibold hover:border-accent-primary/50 transition-colors'
+                            className='w-9 h-9 bg-[#141414] border border-white/10 text-gray-300 rounded-full flex items-center justify-center text-sm font-medium hover:bg-[#1a1a1a] hover:text-white hover:border-white/20 transition-all shadow-sm'
                         >
-                            {userData ? userData?.name.slice(0, 1).toUpperCase() : <User size={16} className="text-gray-400" />}
+                            {userData ? userData?.name.slice(0, 1).toUpperCase() : <User size={15} />}
                         </button>
 
                         <AnimatePresence>
                             {showUserPopup && (
                                 <motion.div 
-                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className='absolute right-0 mt-4 w-56 glass-card p-2 z-50 flex flex-col gap-1'
+                                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                                    transition={{ duration: 0.2, ease: "easeOut" }}
+                                    className='absolute right-0 top-[calc(100%+0.75rem)] w-56 bg-[#0d0d0d]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.7)] ring-1 ring-white/5 z-50 flex flex-col'
                                 >
-                                    <div className="px-3 py-2 mb-2 border-b border-white/5">
-                                        <p className='text-sm text-gray-400'>Signed in as</p>
-                                        <p className='text-sm font-medium text-white truncate'>{userData?.name}</p>
+                                    <div className="px-3 py-3 mb-1 flex flex-col gap-0.5">
+                                        <p className='text-[11px] uppercase tracking-wider font-semibold text-gray-500'>Signed in as</p>
+                                        <p className='text-[13px] font-medium text-gray-200 truncate'>{userData?.name}</p>
                                     </div>
-
-                                    <button 
-                                        onClick={() => { setShowUserPopup(false); navigate("/history"); }} 
-                                        className='w-full text-left text-sm py-2 px-3 rounded-lg hover:bg-white/5 text-gray-300 hover:text-white transition-colors flex items-center gap-2'
-                                    >
-                                        <Bot size={16} />
-                                        Dashboard
-                                    </button>
-                                    <button 
-                                        onClick={handleLogout}
-                                        className='w-full text-left text-sm py-2 px-3 rounded-lg hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors flex items-center gap-2'
-                                    >
-                                        <LogOut size={16} />
-                                        Logout
-                                    </button>
+                                    <div className="h-px w-full bg-white/5 mb-1" />
+                                    
+                                    <div className="flex flex-col gap-0.5">
+                                        <button 
+                                            onClick={() => { setShowUserPopup(false); navigate("/history"); }} 
+                                            className='w-full text-left text-[13px] py-2 px-3 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white transition-colors flex items-center gap-2.5 font-medium'
+                                        >
+                                            <Bot size={15} />
+                                            Dashboard
+                                        </button>
+                                        <button 
+                                            onClick={handleLogout}
+                                            className='w-full text-left text-[13px] py-2 px-3 rounded-xl hover:bg-red-500/10 text-red-500 hover:text-red-400 transition-colors flex items-center gap-2.5 font-medium'
+                                        >
+                                            <LogOut size={15} />
+                                            Logout
+                                        </button>
+                                    </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>

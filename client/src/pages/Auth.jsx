@@ -50,12 +50,9 @@ function Auth({isModel = false}) {
         ${isModel ? "max-w-md p-8 rounded-3xl" : "max-w-lg p-12 rounded-[32px]"}
         bg-white shadow-2xl border border-gray-200
       `}>
-            <div className='flex items-center justify-center gap-3 mb-6'>
-                <div className='bg-black text-white p-2 rounded-lg'>
-                    <BsRobot size={18}/>
-
-                </div>
-                <h2 className='font-semibold text-lg'>InterviewForge.AI</h2>
+            <div className='flex items-center justify-center gap-2 mb-6'>
+                <img src="/nextRound.png" alt="NextRound AI" className="w-10 h-10 object-contain rounded-xl" />
+                <h2 className='font-semibold text-lg'>NextRound AI</h2>
             </div>
 
             <h1 className='text-2xl md:text-3xl font-semibold text-center leading-snug mb-4'>

@@ -14,7 +14,7 @@ export const BOILERPLATES = {
 
 export const PISTON_LANGUAGES = {
   python: { language: 'python', version: '3.10.0' },
-  cpp: { language: 'c++', version: '10.2.0' },
+  cpp: { language: 'cpp', version: '10.2.0' },
   java: { language: 'java', version: '15.0.2' },
   javascript: { language: 'javascript', version: '18.15.0' },
   typescript: { language: 'typescript', version: '5.0.3' },

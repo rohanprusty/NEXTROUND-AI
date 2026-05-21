@@ -9,11 +9,11 @@ function Footer() {
       
       <div className='w-full max-w-6xl mx-auto flex flex-col items-center text-center relative z-10'>
         <div className='flex items-center gap-3 mb-6'>
-          <div className='relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 border border-accent-primary/30'>
-            <Bot size={20} className="text-accent-primary" />
+          <div className='relative flex items-center justify-center w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 border border-accent-primary/30'>
+            <img src="/nextRound.png" alt="NextRound AI" className="w-full h-full object-contain" />
           </div>
           <h2 className='font-bold text-xl tracking-tight text-white'>
-            InterviewForge<span className="text-gradient">.AI</span>
+            NextRound<span className="text-gradient"> AI</span>
           </h2>
         </div>
         
@@ -24,13 +24,14 @@ function Footer() {
         <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-white/10 to-transparent mb-8" />
         
         <div className="flex gap-6 text-sm text-gray-500">
-          <span className="hover:text-accent-primary transition-colors cursor-pointer">Privacy Policy</span>
-          <span className="hover:text-accent-primary transition-colors cursor-pointer">Terms of Service</span>
-          <span className="hover:text-accent-primary transition-colors cursor-pointer">Contact</span>
+          <a href="#" className="hover:text-accent-primary transition-colors cursor-pointer">Privacy Policy</a>
+          <a href="#" className="hover:text-accent-primary transition-colors cursor-pointer">Terms of Service</a>
+          <a href="#" className="hover:text-accent-primary transition-colors cursor-pointer">Contact Us</a>
+          <a href="#" className="hover:text-accent-primary transition-colors cursor-pointer">Mail - rohankrprusty@gmail.com</a>
         </div>
         
         <p className="text-xs text-gray-600 mt-8">
-          &copy; {new Date().getFullYear()} InterviewForge AI. All rights reserved.
+          &copy; {new Date().getFullYear()} NextRound AI. All rights reserved. Built By - <a href="https://github.com/rohan064" target="_blank" className="text-accent-primary hover:text-accent-secondary transition-colors"> Rohan Prusty</a> || IIIT JABALPUR.
         </p>
       </div>
     </div>

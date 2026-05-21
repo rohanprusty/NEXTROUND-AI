@@ -1,9 +1,24 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Terminal as TerminalIcon, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 function InterviewTerminal({ output, error, isExecuting, runStats }) {
+  const bodyRef = useRef(null);
+
+  useEffect(() => {
+    if (bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+  }, [output, error, isExecuting]);
+
+  const getGlowStyles = () => {
+    if (isExecuting) return "border-yellow-500/40 shadow-[0_0_20px_rgba(234,179,8,0.1)]";
+    if (error) return "border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.1)]";
+    if (runStats && output) return "border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.1)]";
+    return "border-white/10 shadow-inner";
+  };
+
   return (
-    <div className="h-full w-full bg-black/90 rounded-2xl border border-white/10 shadow-inner flex flex-col font-mono text-sm overflow-hidden">
+    <div className={`h-full w-full bg-black/90 rounded-2xl border flex flex-col font-mono text-sm overflow-hidden transition-all duration-500 ${getGlowStyles()}`}>
       {/* Terminal Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/5">
         <div className="flex items-center gap-2 text-gray-400">
@@ -25,7 +40,7 @@ function InterviewTerminal({ output, error, isExecuting, runStats }) {
       </div>
 
       {/* Terminal Body */}
-      <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+      <div ref={bodyRef} className="flex-1 p-4 overflow-y-auto custom-scrollbar scroll-smooth">
         {isExecuting ? (
           <div className="flex items-center gap-2 text-gray-400 animate-pulse">
             <div className="w-2 h-4 bg-gray-400 animate-bounce" />
