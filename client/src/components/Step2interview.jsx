@@ -3,14 +3,14 @@ import maleVideo from "../assets/videos/male-ai.mp4"
 import femaleVideo from "../assets/videos/female-ai.mp4"
 import Timer from './Timer'
 import { motion } from "motion/react"
-import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
+import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash } from "react-icons/fa";
 import { useState } from 'react'
 import { useRef } from 'react'
 import { useEffect } from 'react'
 import axios from "axios"
 import { ServerUrl } from '../App'
 import { BsArrowRight } from 'react-icons/bs'
-
+import * as faceapi from 'face-api.js'
 function Step2Interview({ interviewData, onFinish }) {
   const { interviewId, questions, userName } = interviewData;
   const [isIntroPhase, setIsIntroPhase] = useState(true);
@@ -29,7 +29,12 @@ function Step2Interview({ interviewData, onFinish }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voiceGender, setVoiceGender] = useState("female");
   const [subtitle, setSubtitle] = useState("");
+  const [isCameraVisible, setIsCameraVisible] = useState(true);
 
+  const [emotionTally, setEmotionTally] = useState({ happy: 0, neutral: 0, nervous: 0 });
+  const webcamRef = useRef(null);
+  const webcamStreamRef = useRef(null);
+  const faceIntervalRef = useRef(null);
 
   const videoRef = useRef(null);
 
@@ -75,9 +80,96 @@ function Step2Interview({ interviewData, onFinish }) {
     };
 
     loadVoices();
+    loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
 
   }, [])
+
+  // Load face-api.js models ONCE
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+        await faceapi.nets.faceExpressionNet.loadFromUri('/models');
+      } catch (err) {
+        console.error("Error loading face-api models", err);
+      }
+    };
+    loadModels();
+  }, []);
+
+  // Webcam Logic (depends on isCameraVisible)
+  useEffect(() => {
+    let activeStream = null;
+
+    const startWebcam = async () => {
+      if (!isCameraVisible) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        activeStream = stream;
+        webcamStreamRef.current = stream;
+        if (webcamRef.current) {
+          webcamRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error("Webcam access denied", err);
+      }
+    };
+    startWebcam();
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+      if (webcamStreamRef.current) {
+        webcamStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [isCameraVisible]);
+
+  // Face Tracking Logic
+  useEffect(() => {
+    if (isMicOn && isCameraVisible && !isIntroPhase) {
+      faceIntervalRef.current = setInterval(async () => {
+        if (webcamRef.current && webcamRef.current.readyState === 4) {
+          try {
+            const detections = await faceapi.detectSingleFace(
+              webcamRef.current,
+              new faceapi.TinyFaceDetectorOptions()
+            ).withFaceExpressions();
+
+            if (detections) {
+              const expressions = detections.expressions;
+              let dominantEmotion = "";
+              let maxScore = -1;
+              for (const [emotion, score] of Object.entries(expressions)) {
+                if (score > maxScore) {
+                  maxScore = score;
+                  dominantEmotion = emotion;
+                }
+              }
+              
+              setEmotionTally(prev => {
+                const updated = { ...prev };
+                if (dominantEmotion === 'happy' || dominantEmotion === 'surprised') updated.happy += 1;
+                else if (dominantEmotion === 'neutral') updated.neutral += 1;
+                else if (dominantEmotion === 'sad' || dominantEmotion === 'fearful' || dominantEmotion === 'angry' || dominantEmotion === 'disgusted') updated.nervous += 1;
+                return updated;
+              });
+            }
+          } catch(err) {
+            console.error("Face detection error", err);
+          }
+        }
+      }, 2000);
+    } else {
+      if (faceIntervalRef.current) clearInterval(faceIntervalRef.current);
+    }
+
+    return () => {
+      if (faceIntervalRef.current) clearInterval(faceIntervalRef.current);
+    };
+  }, [isMicOn, isIntroPhase, isCameraVisible]);
 
   const videoSource = voiceGender === "male" ? maleVideo : femaleVideo;
 
@@ -251,12 +343,18 @@ function Step2Interview({ interviewData, onFinish }) {
     setIsSubmitting(true)
 
     try {
+      const timeElapsed = currentQuestion.timeLimit - timeLeft || 1;
+      const wordCount = answer.trim().split(/\s+/).filter(w => w.length > 0).length;
+      const wpm = (wordCount / timeElapsed) * 60;
+      
+      const behavioralTelemetry = { emotionTally, wpm: Math.round(wpm) };
+
       const result = await axios.post(ServerUrl + "/api/interview/submit-answer", {
         interviewId,
         questionIndex: currentIndex,
         answer,
-        timeTaken:
-          currentQuestion.timeLimit - timeLeft,
+        timeTaken: timeElapsed,
+        behavioralTelemetry
       } , {withCredentials:true})
 
       setFeedback(result.data.feedback)
@@ -333,7 +431,7 @@ setIsSubmitting(false)
 
         {/* video section */}
         <div className='w-full lg:w-[35%] bg-white flex flex-col items-center p-6 space-y-6 border-r border-gray-200'>
-          <div className='w-full max-w-md rounded-2xl overflow-hidden shadow-xl'>
+          <div className='w-full max-w-md rounded-2xl overflow-hidden shadow-xl relative'>
             <video
               src={videoSource}
               key={videoSource}
@@ -343,6 +441,29 @@ setIsSubmitting(false)
               preload="auto"
               className="w-full h-auto object-cover"
             />
+            {/* Webcam PiP */}
+            <div className="absolute bottom-6 right-6 w-32 h-24 z-50 group">
+              {isCameraVisible ? (
+                <video
+                  ref={webcamRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full rounded-lg shadow-lg border-2 border-green-500 object-cover bg-black"
+                />
+              ) : (
+                <div className="w-full h-full rounded-lg shadow-lg border-2 border-gray-400 bg-gray-800 flex items-center justify-center">
+                  <FaVideoSlash className="text-gray-400 text-2xl" />
+                </div>
+              )}
+              
+              <button
+                onClick={() => setIsCameraVisible(!isCameraVisible)}
+                className="absolute top-1 right-1 bg-black/60 text-white p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+              >
+                {isCameraVisible ? <FaVideoSlash size={14} /> : <FaVideo size={14} />}
+              </button>
+            </div>
           </div>
 
           {/* subtitle */}

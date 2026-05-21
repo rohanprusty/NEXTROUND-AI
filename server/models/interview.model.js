@@ -6,6 +6,7 @@ const questionsSchema = new mongoose.Schema({
   timeLimit: Number,
   answer: String,
   feedback: String,
+  body_language_feedback: String,
   score: { type: Number, default: 0 },
   confidence: { type: Number, default: 0 },
 communication: { type: Number, default: 0 },

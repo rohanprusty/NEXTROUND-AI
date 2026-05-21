@@ -225,7 +225,7 @@ Make questions based on the candidate’s role, experience,interviewMode, projec
 
 export const submitAnswer = async (req, res) => {
   try {
-    const { interviewId, questionIndex, answer, timeTaken } = req.body
+    const { interviewId, questionIndex, answer, timeTaken, behavioralTelemetry } = req.body
 
     const interview = await Interview.findById(interviewId)
     const question = interview.questions[questionIndex]
@@ -277,6 +277,7 @@ Rules:
 - If the answer is weak, score low.
 - If the answer is strong and detailed, score high.
 - Consider clarity, structure, and relevance.
+- **IMPORTANT**: You will receive behavioral telemetry (WPM and emotions). If WPM is > 160 or < 110, or if 'nervous' expressions heavily outweigh 'neutral'/'happy', you MUST lower the confidence score.
 
 Calculate:
 finalScore = average of confidence, communication, and correctness (rounded to nearest whole number).
@@ -297,7 +298,8 @@ Return ONLY valid JSON in this format:
   "communication": number,
   "correctness": number,
   "finalScore": number,
-  "feedback": "short human feedback"
+  "feedback": "short human feedback",
+  "body_language_feedback": "Short sentence advising on their pacing or expression."
 }
 `
       }
@@ -307,6 +309,7 @@ Return ONLY valid JSON in this format:
         content: `
 Question: ${question.question}
 Answer: ${answer}
+Behavioral Telemetry: ${behavioralTelemetry ? JSON.stringify(behavioralTelemetry) : "None provided"}
 `
       }
     ];
@@ -323,6 +326,9 @@ Answer: ${answer}
     question.correctness = parsed.correctness;
     question.score = parsed.finalScore;
     question.feedback = parsed.feedback;
+    if (parsed.body_language_feedback) {
+      question.body_language_feedback = parsed.body_language_feedback;
+    }
     await interview.save();
 
 
@@ -386,6 +392,7 @@ export const finishInterview = async (req,res) => {
         question: q.question,
         score: q.score || 0,
         feedback: q.feedback || "",
+        body_language_feedback: q.body_language_feedback || "",
         confidence: q.confidence || 0,
         communication: q.communication || 0,
         correctness: q.correctness || 0,
