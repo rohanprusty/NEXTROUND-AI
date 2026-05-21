@@ -355,6 +355,12 @@ function Step3Report({ report }) {
                         : "No feedback available for this question."}
                     </p>
                   </div>
+                  {q.questionType === 'coding' && q.codeSnippet && (
+                    <div className="bg-gray-900 text-green-400 p-4 rounded-lg mt-4 font-mono text-sm overflow-x-auto whitespace-pre-wrap">
+                      <p className="text-xs text-gray-400 mb-2 font-sans">Submitted Code:</p>
+                      {q.codeSnippet}
+                    </div>
+                  )}
                   {q.body_language_feedback ? (
                     <div className='mt-3 bg-indigo-50 border border-indigo-200 p-4 rounded-lg flex items-start gap-3'>
                       <div className='text-indigo-600 mt-0.5'>

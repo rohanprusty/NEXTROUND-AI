@@ -142,15 +142,15 @@ You are a real human interviewer conducting a professional interview.
 
 Speak in simple, natural English as if you are directly talking to the candidate.
 
-Generate exactly 5 interview questions.
+Generate exactly 7 interview questions.
+If the InterviewMode is 'Technical', EXACTLY 2 of the 7 questions must be Data Structures & Algorithms (DSA) coding challenges. The other 5 should be conceptual/behavioral.
+If the InterviewMode is 'HR', all 7 questions should be conceptual/behavioral.
 
 Strict Rules:
-- Each question must contain between 15 and 25 words.
-- Each question must be a single complete sentence.
-- Do NOT number them.
-- Do NOT add explanations.
-- Do NOT add extra text before or after.
-- One question per line only.
+- Return EXACTLY a JSON array of 7 objects. No other text.
+- Each object must have:
+  - "question": string (between 15 and 25 words, a single complete sentence, no numbering, no extra text, conversational)
+  - "questionType": string ("coding" for DSA challenges, "conceptual" for all others)
 - Keep language simple and conversational.
 - Questions must feel practical and realistic.
 
@@ -159,9 +159,11 @@ Question 1 → easy
 Question 2 → easy  
 Question 3 → medium  
 Question 4 → medium  
-Question 5 → hard  
+Question 5 → hard (or medium coding)
+Question 6 → hard (or hard coding)
+Question 7 → hard  
 
-Make questions based on the candidate’s role, experience,interviewMode, projects, skills, and resume details.
+Make questions based on the candidate’s role, experience, InterviewMode, projects, skills, and resume details.
 `
       }
       ,
@@ -182,11 +184,22 @@ Make questions based on the candidate’s role, experience,interviewMode, projec
 
     }
 
-    const questionsArray = aiResponse
-      .split("\n")
-      .map(q => q.trim())
-      .filter(q => q.length > 0)
-      .slice(0, 5);
+    let questionsArray = [];
+    try {
+      const jsonStart = aiResponse.indexOf('[');
+      const jsonEnd = aiResponse.lastIndexOf(']');
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        questionsArray = JSON.parse(aiResponse.substring(jsonStart, jsonEnd + 1));
+      } else {
+        questionsArray = JSON.parse(aiResponse);
+      }
+      questionsArray = questionsArray.slice(0, 7);
+    } catch(err) {
+      console.error("Failed to parse AI response as JSON", err);
+      return res.status(500).json({
+        message: "AI failed to generate valid JSON questions."
+      });
+    }
 
     if (questionsArray.length === 0) {
       
@@ -205,9 +218,10 @@ Make questions based on the candidate’s role, experience,interviewMode, projec
       mode,
       resumeText: safeResume,
       questions: questionsArray.map((q, index) => ({
-        question: q,
-        difficulty: ["easy", "easy", "medium", "medium", "hard"][index],
-        timeLimit: [60, 60, 90, 90, 120][index],
+        question: q.question,
+        questionType: q.questionType || "conceptual",
+        difficulty: ["easy", "easy", "medium", "medium", "hard", "hard", "hard"][index] || "medium",
+        timeLimit: [60, 60, 90, 90, 180, 180, 120][index] || 60,
       }))
     })
 
@@ -225,7 +239,7 @@ Make questions based on the candidate’s role, experience,interviewMode, projec
 
 export const submitAnswer = async (req, res) => {
   try {
-    const { interviewId, questionIndex, answer, timeTaken, behavioralTelemetry } = req.body
+    const { interviewId, questionIndex, answer, timeTaken, behavioralTelemetry, codeSnippet } = req.body
 
     const interview = await Interview.findById(interviewId)
     const question = interview.questions[questionIndex]
@@ -264,12 +278,13 @@ export const submitAnswer = async (req, res) => {
 You are a professional human interviewer evaluating a candidate's answer in a real interview.
 
 Evaluate naturally and fairly, like a real person would.
+The candidate may submit a verbal explanation AND a code snippet. If \`codeSnippet\` is provided, evaluate the algorithmic logic, Big-O complexity, and syntax of the code alongside their verbal explanation. If no code is provided, evaluate just the verbal explanation.
 
 Score the answer in these areas (0 to 10):
 
 1. Confidence – Does the answer sound clear, confident, and well-presented?
 2. Communication – Is the language simple, clear, and easy to understand?
-3. Correctness – Is the answer accurate, relevant, and complete?
+3. Correctness – Is the answer/code accurate, relevant, logically sound, and complete?
 
 Rules:
 - Be realistic and unbiased.
@@ -309,6 +324,7 @@ Return ONLY valid JSON in this format:
         content: `
 Question: ${question.question}
 Answer: ${answer}
+${codeSnippet ? `Code Snippet: \n${codeSnippet}` : ""}
 Behavioral Telemetry: ${behavioralTelemetry ? JSON.stringify(behavioralTelemetry) : "None provided"}
 `
       }
@@ -321,6 +337,7 @@ Behavioral Telemetry: ${behavioralTelemetry ? JSON.stringify(behavioralTelemetry
     const parsed = JSON.parse(aiResponse);
 
     question.answer = answer;
+    if (codeSnippet) question.codeSnippet = codeSnippet;
     question.confidence = parsed.confidence;
     question.communication = parsed.communication;
     question.correctness = parsed.correctness;
@@ -390,6 +407,8 @@ export const finishInterview = async (req,res) => {
       correctness: Number(avgCorrectness.toFixed(1)),
       questionWiseScore: interview.questions.map((q) => ({
         question: q.question,
+        questionType: q.questionType,
+        codeSnippet: q.codeSnippet,
         score: q.score || 0,
         feedback: q.feedback || "",
         body_language_feedback: q.body_language_feedback || "",

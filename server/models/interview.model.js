@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 const questionsSchema = new mongoose.Schema({
      question: String,
+  questionType: { type: String, enum: ['conceptual', 'coding'], default: 'conceptual' },
+  codeSnippet: { type: String, default: "" },
   difficulty: String,
   timeLimit: Number,
   answer: String,

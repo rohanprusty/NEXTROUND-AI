@@ -12,6 +12,7 @@ import { ServerUrl } from '../App'
 import { BsArrowRight } from 'react-icons/bs'
 import * as faceapi from 'face-api.js'
 import toast from 'react-hot-toast'
+import { Editor } from "@monaco-editor/react";
 function Step2Interview({ interviewData, onFinish }) {
   const { interviewId, questions, userName } = interviewData;
   const [isIntroPhase, setIsIntroPhase] = useState(true);
@@ -22,6 +23,7 @@ function Step2Interview({ interviewData, onFinish }) {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answer, setAnswer] = useState("");
+  const [codeAnswer, setCodeAnswer] = useState("");
   const [feedback, setFeedback] = useState("");
   const [timeLeft, setTimeLeft] = useState(
     questions[0]?.timeLimit || 60
@@ -354,6 +356,7 @@ function Step2Interview({ interviewData, onFinish }) {
         interviewId,
         questionIndex: currentIndex,
         answer,
+        codeSnippet: codeAnswer,
         timeTaken: timeElapsed,
         behavioralTelemetry
       } , {withCredentials:true})
@@ -369,6 +372,7 @@ setIsSubmitting(false)
 
   const handleNext =async () => {
     setAnswer("");
+    setCodeAnswer("");
     setFeedback("");
 
     if (currentIndex + 1 >= questions.length) {
@@ -444,14 +448,14 @@ setIsSubmitting(false)
               className="w-full h-auto object-cover"
             />
             {/* Webcam PiP */}
-            <div className="absolute bottom-6 right-6 w-32 h-24 z-50 group">
+            <div className="absolute bottom-6 right-6 w-48 h-36 z-50 group">
               {isCameraVisible ? (
                 <video
                   ref={webcamRef}
                   autoPlay
                   muted
                   playsInline
-                  className="w-full h-full rounded-lg shadow-lg border-2 border-green-500 object-cover bg-black"
+                  className="w-full h-full rounded-lg shadow-lg border-2 border-green-500 object-cover bg-black scale-x-[-1]"
                 />
               ) : (
                 <div className="w-full h-full rounded-lg shadow-lg border-2 border-gray-400 bg-gray-800 flex items-center justify-center">
@@ -528,11 +532,31 @@ setIsSubmitting(false)
             <div className='text-base sm:text-lg font-semibold text-gray-800 leading-relaxed '>{currentQuestion?.question}</div>
           </div>)
           }
-          <textarea
-            placeholder="Type your answer here..."
-            onChange={(e) => setAnswer(e.target.value)}
-            value={answer}
-            className="flex-1 bg-gray-100 p-4 sm:p-6 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 transition text-gray-800" />
+          {currentQuestion?.questionType === 'coding' ? (
+            <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-[300px]">
+              <textarea
+                placeholder="Explain your logic here while typing..."
+                onChange={(e) => setAnswer(e.target.value)}
+                value={answer}
+                className="flex-[0.4] bg-gray-100 p-4 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 transition text-gray-800" />
+              <div className="flex-[0.6] rounded-2xl overflow-hidden border border-gray-200">
+                <Editor
+                  height="100%"
+                  defaultLanguage="cpp"
+                  theme="vs-dark"
+                  value={codeAnswer}
+                  onChange={(val) => setCodeAnswer(val || "")}
+                  options={{ minimap: { enabled: false } }}
+                />
+              </div>
+            </div>
+          ) : (
+            <textarea
+              placeholder="Type your answer here..."
+              onChange={(e) => setAnswer(e.target.value)}
+              value={answer}
+              className="flex-1 bg-gray-100 p-4 sm:p-6 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 transition text-gray-800" />
+          )}
 
 
          {!feedback ? ( <div className='flex items-center gap-4 mt-6'>
