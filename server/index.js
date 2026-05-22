@@ -11,7 +11,7 @@ import paymentRouter from "./routes/payment.route.js"
 
 const app = express()
 app.use(cors({
-    origin: ["http://localhost:5173", "https://ai-interview-agent-1-client.onrender.com"],
+    origin: "https://nextround-ai-frontend.onrender.com",
     credentials:true
 }))
 
