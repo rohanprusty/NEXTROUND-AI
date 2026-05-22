@@ -84,7 +84,7 @@ Return strictly JSON:
 
 export const generateQuestion = async (req, res) => {
   try {
-    let { role, experience, mode, resumeText, projects, skills } = req.body
+    let { role, experience, mode, targetCompany, resumeText, projects, skills } = req.body
 
     role = role?.trim();
     experience = experience?.trim();
@@ -139,6 +139,8 @@ export const generateQuestion = async (req, res) => {
         role: "system",
         content: `
 You are a real human interviewer conducting a professional interview.
+
+Target Company/Framework: ${targetCompany || 'General'}. You must adapt the phrasing, difficulty curve, and behavioral focus to match the known hiring rubrics of this company/category. For example, if Amazon, inject 'Leadership Principles'. If Google, focus on 'Googleyness' and extreme scale. If McKinsey, focus on structured MECE frameworks.
 
 Speak in simple, natural English as if you are directly talking to the candidate.
 
@@ -213,6 +215,7 @@ Make questions based on the candidate’s role, experience, InterviewMode, proje
 
     const interview = await Interview.create({
       userId: user._id,
+      targetCompany: targetCompany || 'General',
       role,
       experience,
       mode,
@@ -276,6 +279,8 @@ export const submitAnswer = async (req, res) => {
         role: "system",
         content: `
 You are a professional human interviewer evaluating a candidate's answer in a real interview.
+
+Target Company Standard: ${interview.targetCompany || 'General'}. Evaluate this candidate's answer as if you are a strict hiring manager at this exact company. Apply their specific cultural values and technical rigor to your scoring and feedback.
 
 Evaluate naturally and fairly, like a real person would.
 The candidate may submit a verbal explanation AND a code snippet. If \`codeSnippet\` is provided, evaluate the algorithmic logic, Big-O complexity, and syntax of the code alongside their verbal explanation. If no code is provided, evaluate just the verbal explanation.

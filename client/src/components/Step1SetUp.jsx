@@ -11,6 +11,7 @@ function Step1SetUp({ onStart }) {
     const dispatch = useDispatch();
     const [role, setRole] = useState("");
     const [experience, setExperience] = useState("");
+    const [targetCompany, setTargetCompany] = useState("");
     const [mode, setMode] = useState("Technical");
     const [resumeFile, setResumeFile] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -47,7 +48,7 @@ function Step1SetUp({ onStart }) {
     const handleStart = async () => {
         setLoading(true);
         try {
-           const result = await axios.post(ServerUrl + "/api/interview/generate-questions", { role, experience, mode, resumeText, projects, skills }, { withCredentials: true });
+           const result = await axios.post(ServerUrl + "/api/interview/generate-questions", { role, experience, mode, targetCompany, resumeText, projects, skills }, { withCredentials: true });
            if(userData){
                dispatch(setUserData({ ...userData, credits: result.data.creditsLeft }));
            }
@@ -141,6 +142,30 @@ function Step1SetUp({ onStart }) {
                             <input type='text' placeholder='Experience (e.g. 3 years)'
                                 className='w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-primary focus:border-transparent outline-none transition rounded-lg'
                                 onChange={(e) => setExperience(e.target.value)} value={experience} />
+                        </div>
+
+                        <div className='space-y-3'>
+                            <div className='relative'>
+                                <input type='text' placeholder='Target Company (e.g., Google, Stripe) - Optional'
+                                    className='w-full px-4 py-3 bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-primary focus:border-transparent outline-none transition rounded-lg'
+                                    onChange={(e) => setTargetCompany(e.target.value)} value={targetCompany} />
+                            </div>
+                            <div className='flex flex-wrap gap-2'>
+                                {["FAANG", "MAANG", "Product-Based", "Service-Based (TCS/Wipro)", "Big 4 Consulting", "Stripe/Fintech", "Startup"].map((tag) => (
+                                    <button
+                                        key={tag}
+                                        type="button"
+                                        onClick={() => setTargetCompany(tag)}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                            targetCompany === tag 
+                                            ? 'bg-violet-600/20 border border-violet-500 text-violet-300' 
+                                            : 'bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        {tag}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="relative">

@@ -17,6 +17,7 @@ correctness: { type: Number, default: 0 },
 
 
 const interviewSchema = new mongoose.Schema({
+    targetCompany: { type: String, default: 'General' },
     userId:{
         type:mongoose.Schema.Types.ObjectId,
         ref:"User",
