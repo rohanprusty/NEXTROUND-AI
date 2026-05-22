@@ -311,7 +311,7 @@ function Step3Report({ report }) {
             </h3>
             <div className='space-y-6'>
               {questionWiseScore.map((q, i) => (
-                <div key={i} className='bg-white/5 p-6 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-white/10 transition-colors'>
+                <div key={i} className={`bg-white/5 p-6 rounded-2xl border ${q?.cheatingDetected ? 'border-red-500/50 bg-red-900/10' : 'border-white/5'} relative overflow-hidden group hover:border-white/10 transition-colors`}>
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
                     <div className="flex-1">
                       <p className="text-xs font-bold text-accent-secondary tracking-widest uppercase mb-2">
@@ -320,8 +320,18 @@ function Step3Report({ report }) {
                       <p className="font-semibold text-white text-base leading-relaxed">
                         {q?.question || "Question not available"}
                       </p>
+                      {q?.cheatingDetected && (
+                        <div className="mt-3">
+                          <span className="bg-red-500/20 text-red-400 border border-red-500/50 px-3 py-1 rounded-full text-xs">⚠️ Proctoring Violation: {q?.cheatingDetails?.join(", ")}</span>
+                        </div>
+                      )}
+                      {q?.feedback?.includes("Question skipped") && (
+                        <div className="mt-3">
+                          <span className="bg-amber-500/20 text-amber-400 border border-amber-500/50 px-3 py-1 rounded-full text-xs">⏭️ Skipped</span>
+                        </div>
+                      )}
                     </div>
-                    <div className='bg-accent-tertiary/10 text-accent-tertiary border border-accent-tertiary/20 px-4 py-1.5 rounded-full font-bold text-sm shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.2)]'>
+                    <div className={`${q?.cheatingDetected ? 'bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-accent-tertiary/10 text-accent-tertiary border-accent-tertiary/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]'} border px-4 py-1.5 rounded-full font-bold text-sm shrink-0`}>
                       {q?.score ?? 0}/10
                     </div>
                   </div>

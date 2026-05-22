@@ -13,11 +13,14 @@ const questionsSchema = new mongoose.Schema({
   confidence: { type: Number, default: 0 },
 communication: { type: Number, default: 0 },
 correctness: { type: Number, default: 0 },
+cheatingDetected: { type: Boolean, default: false },
+cheatingDetails: { type: [String], default: [] }
 })
 
 
 const interviewSchema = new mongoose.Schema({
     targetCompany: { type: String, default: 'General' },
+    interviewMode: { type: String, enum: ['Practice', 'Strict'], default: 'Practice' },
     userId:{
         type:mongoose.Schema.Types.ObjectId,
         ref:"User",

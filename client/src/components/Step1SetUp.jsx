@@ -12,6 +12,7 @@ function Step1SetUp({ onStart }) {
     const [role, setRole] = useState("");
     const [experience, setExperience] = useState("");
     const [targetCompany, setTargetCompany] = useState("");
+    const [interviewMode, setInterviewMode] = useState("Practice");
     const [mode, setMode] = useState("Technical");
     const [resumeFile, setResumeFile] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -48,7 +49,7 @@ function Step1SetUp({ onStart }) {
     const handleStart = async () => {
         setLoading(true);
         try {
-           const result = await axios.post(ServerUrl + "/api/interview/generate-questions", { role, experience, mode, targetCompany, resumeText, projects, skills }, { withCredentials: true });
+           const result = await axios.post(ServerUrl + "/api/interview/generate-questions", { role, experience, mode, targetCompany, interviewMode, resumeText, projects, skills }, { withCredentials: true });
            if(userData){
                dispatch(setUserData({ ...userData, credits: result.data.creditsLeft }));
            }
@@ -175,6 +176,16 @@ function Step1SetUp({ onStart }) {
                                 <option value="Technical" className="bg-[#0B1120] text-white">Technical Interview</option>
                                 <option value="HR" className="bg-[#0B1120] text-white">HR / Behavioral</option>
                             </select>
+                        </div>
+
+                        <div className="relative space-y-2">
+                            <select value={interviewMode}
+                                onChange={(e) => setInterviewMode(e.target.value)}
+                                className='w-full py-3 px-4 bg-white/5 border border-white/10 text-white focus:ring-2 focus:ring-accent-primary focus:border-transparent outline-none transition rounded-lg appearance-none cursor-pointer'>
+                                <option value="Practice" className="bg-[#0B1120] text-white">Practice Mode</option>
+                                <option value="Strict" className="bg-[#0B1120] text-red-400">Strict Mode (Proctored)</option>
+                            </select>
+                            <p className="text-xs text-gray-500 pl-1">Strict mode monitors tab-switching and copy/pasting. Violations result in an automatic zero.</p>
                         </div>
 
                         {!analysisDone && (

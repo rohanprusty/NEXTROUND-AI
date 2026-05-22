@@ -55,7 +55,7 @@ function Navbar() {
                     
                     {/* Navigation Links for Desktop */}
                     <div className="hidden md:flex items-center gap-6 mr-4 text-sm font-medium text-gray-300">
-                        <span onClick={() => navigate('/interview')} className="hover:text-white cursor-pointer transition-colors hover:glow-text">Practice</span>
+                        <span onClick={() => navigate('/interview')} className="hover:text-white cursor-pointer transition-colors hover:glow-text">Interview Arena</span>
                         <span onClick={() => navigate('/history')} className="hover:text-white cursor-pointer transition-colors hover:glow-text">Analytics</span>
                         <span onClick={() => navigate('/pricing')} className="hover:text-white cursor-pointer transition-colors hover:glow-text">Pricing</span>
                     </div>

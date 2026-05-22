@@ -3,7 +3,7 @@ import maleVideo from "../assets/videos/male-ai.mp4";
 import femaleVideo from "../assets/videos/female-ai.mp4";
 import Timer from './Timer';
 import { motion, AnimatePresence } from "motion/react";
-import { Mic, MicOff, Video, VideoOff, Send, ArrowRight, Brain, Eye, Activity, Smile, Frown, Meh, Cpu } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Send, ArrowRight, Brain, Eye, Activity, Smile, Frown, Meh, Cpu, ShieldAlert, Building, Code, User } from "lucide-react";
 import axios from "axios";
 import { ServerUrl } from '../App';
 import * as faceapi from 'face-api.js';
@@ -13,7 +13,7 @@ import InterviewEditor, { BOILERPLATES, PISTON_LANGUAGES } from './InterviewEdit
 import InterviewTerminal from './InterviewTerminal';
 
 function Step2Interview({ interviewData, onFinish }) {
-  const { interviewId, questions, userName } = interviewData;
+  const { interviewId, questions, userName, mode, targetCompany, interviewMode } = interviewData;
   const [isIntroPhase, setIsIntroPhase] = useState(true);
 
   const [isMicOn, setIsMicOn] = useState(true);
@@ -42,17 +42,77 @@ function Step2Interview({ interviewData, onFinish }) {
 
   const [emotionTally, setEmotionTally] = useState({ happy: 0, neutral: 0, nervous: 0 });
   const [currentEmotion, setCurrentEmotion] = useState("neutral");
+  const cheatingFlagsRef = useRef([]);
+  const currentIndexRef = useRef(currentIndex);
+  const interviewIdRef = useRef(interviewId);
+  const isSubmittingRef = useRef(isSubmitting);
+  
+  const currentQuestion = questions[currentIndex];
+  const timeLimitRef = useRef(currentQuestion?.timeLimit || 60);
+  const isStrict = interviewData.interviewMode === 'Strict';
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+    interviewIdRef.current = interviewId;
+    isSubmittingRef.current = isSubmitting;
+    timeLimitRef.current = currentQuestion?.timeLimit || 60;
+  }, [currentIndex, interviewId, isSubmitting, currentQuestion]);
   
   const webcamRef = useRef(null);
   const webcamStreamRef = useRef(null);
   const faceIntervalRef = useRef(null);
   const videoRef = useRef(null);
 
-  const currentQuestion = questions[currentIndex];
-
   useEffect(() => {
     setCodeAnswer(BOILERPLATES[language]);
   }, []);
+
+  const triggerPenaltyRef = useRef(null);
+  
+  // Update ref to latest function on every render
+  // (We'll assign this at the top of the component or just below its definition, but since it's a ref we can just update it here if we want. Wait, we need the actual function assigned.)
+
+  useEffect(() => {
+    if (isStrict) {
+      setIsCameraVisible(true);
+    }
+  }, [isStrict]);
+
+  useEffect(() => {
+    if (!isStrict) return;
+
+    const handleBlur = () => {
+      if (triggerPenaltyRef.current) triggerPenaltyRef.current("Tab Switch or Lost Focus");
+    };
+
+    window.addEventListener("blur", handleBlur);
+    
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleBlur();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const handleCopy = (e) => {
+      e.preventDefault();
+      if (triggerPenaltyRef.current) triggerPenaltyRef.current("Copy Attempted");
+    };
+    document.addEventListener("copy", handleCopy);
+
+    const handlePaste = (e) => {
+      e.preventDefault();
+      if (triggerPenaltyRef.current) triggerPenaltyRef.current("Paste Attempted");
+    };
+    document.addEventListener("paste", handlePaste);
+
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("copy", handleCopy);
+      document.removeEventListener("paste", handlePaste);
+    };
+  }, [isStrict]);
 
   useEffect(() => {
     const loadVoices = () => {
@@ -119,6 +179,10 @@ function Step2Interview({ interviewData, onFinish }) {
         }
       } catch (err) {
         console.error("Webcam access denied", err);
+        setIsCameraVisible(false);
+        if (isStrict) {
+          triggerCheatingPenalty("Camera turned off in Strict Mode");
+        }
       }
     };
     startWebcam();
@@ -144,6 +208,11 @@ function Step2Interview({ interviewData, onFinish }) {
 
   // Face Tracking Logic
   useEffect(() => {
+    if (isStrict && !isCameraVisible) {
+      triggerCheatingPenalty("Camera turned off in Strict Mode");
+      return;
+    }
+
     if (isMicOn && isCameraVisible && !isIntroPhase) {
       faceIntervalRef.current = setInterval(async () => {
         if (webcamRef.current && webcamRef.current.readyState === 4) {
@@ -173,6 +242,8 @@ function Step2Interview({ interviewData, onFinish }) {
                 else if (dominantEmotion === 'sad' || dominantEmotion === 'fearful' || dominantEmotion === 'angry' || dominantEmotion === 'disgusted') updated.nervous += 1;
                 return updated;
               });
+            } else if (isStrict) {
+              triggerCheatingPenalty("Face not visible in camera");
             }
           } catch(err) {
             console.error("Face detection error", err);
@@ -337,7 +408,36 @@ function Step2Interview({ interviewData, onFinish }) {
         answer: fullAnswer,
         codeSnippet: codeAnswer,
         timeTaken: timeElapsed,
-        behavioralTelemetry
+        behavioralTelemetry,
+        cheatingFlags: cheatingFlagsRef.current
+      }, { withCredentials: true });
+
+      setFeedback(result.data.feedback);
+      speakText(result.data.feedback);
+      setIsSubmitting(false);
+    } catch (error) {
+      console.log(error);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSkipQuestion = async () => {
+    if (isSubmitting) return;
+    stopMic();
+    setIsSubmitting(true);
+
+    try {
+      const timeElapsed = currentQuestion.timeLimit - timeLeft || 1;
+      
+      const result = await axios.post(ServerUrl + "/api/interview/submit-answer", {
+        interviewId,
+        questionIndex: currentIndex,
+        answer: "",
+        codeSnippet: "",
+        timeTaken: timeElapsed,
+        behavioralTelemetry: { emotionTally, wpm: 0 },
+        cheatingFlags: cheatingFlagsRef.current,
+        isSkipped: true
       }, { withCredentials: true });
 
       setFeedback(result.data.feedback);
@@ -356,6 +456,7 @@ function Step2Interview({ interviewData, onFinish }) {
     setTerminalOutput("");
     setTerminalError("");
     setFeedback("");
+    cheatingFlagsRef.current = [];
 
     if (currentIndex + 1 >= questions.length) {
       finishInterview();
@@ -367,11 +468,61 @@ function Step2Interview({ interviewData, onFinish }) {
     setTimeout(() => { if (isMicOn) startMic(); }, 500);
   };
 
+  const triggerCheatingPenalty = async (reason) => {
+    if (isSubmittingRef.current) return;
+    setIsSubmitting(true);
+    isSubmittingRef.current = true;
+    
+    stopMic();
+    toast.error("Cheating detected: " + reason);
+
+    try {
+      const timeElapsed = timeLimitRef.current - timeLeft || 1;
+      
+      await axios.post(ServerUrl + "/api/interview/submit-answer", {
+        interviewId: interviewIdRef.current,
+        questionIndex: currentIndexRef.current,
+        answer: "",
+        codeSnippet: "",
+        timeTaken: timeElapsed,
+        behavioralTelemetry: { emotionTally, wpm: 0 },
+        isCheating: true,
+        cheatingReason: reason
+      }, { withCredentials: true });
+
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+      
+      setTranscript("");
+      setInterimTranscript("");
+      setCodeAnswer(BOILERPLATES[language] || "");
+      setTerminalOutput("");
+      setTerminalError("");
+      setFeedback("");
+      cheatingFlagsRef.current = [];
+
+      if (currentIndexRef.current + 1 >= questions.length) {
+        finishInterview();
+        return;
+      }
+
+      setCurrentIndex(currentIndexRef.current + 1);
+      setTimeout(() => { if (isMicOn) startMic(); }, 500);
+
+    } catch (error) {
+      console.log(error);
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
+  };
+
+  triggerPenaltyRef.current = triggerCheatingPenalty;
+
   const finishInterview = async () => {
     stopMic();
     setIsMicOn(false);
     try {
-      const result = await axios.post(ServerUrl + "/api/interview/finish", { interviewId }, { withCredentials: true });
+      const result = await axios.post(ServerUrl + "/api/interview/finish", { interviewId: interviewIdRef.current }, { withCredentials: true });
       toast.success("Interview completed! Generating report...");
       onFinish(result.data);
     } catch (error) {
@@ -452,14 +603,50 @@ function Step2Interview({ interviewData, onFinish }) {
 
   return (
     <div className='min-h-screen bg-bg-primary p-4 sm:p-6 lg:p-8 flex flex-col gap-6 relative'>
+      {/* Full-screen Camera Warning Overlay */}
+      {isStrict && !isCameraVisible && (
+        <div className="fixed inset-0 z-[100] backdrop-blur-md bg-black/80 flex flex-col items-center justify-center p-6 text-center">
+          <div className="bg-red-500/10 border border-red-500/50 rounded-2xl p-8 max-w-md w-full flex flex-col items-center gap-4 shadow-[0_0_50px_rgba(239,68,68,0.2)]">
+            <VideoOff size={48} className="text-red-500 animate-pulse" />
+            <h2 className="text-2xl font-bold text-white tracking-tight">CAMERA MANDATORY</h2>
+            <p className="text-gray-300 leading-relaxed">
+              Please enable your webcam to continue in Strict Mode. Access will be blocked until the camera is active.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Background glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-accent-primary/10 blur-[150px] pointer-events-none" />
 
       {/* Header */}
       <header className="flex justify-between items-center glass-card px-6 py-3 relative z-10">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Brain className="text-accent-primary" size={24} />
-          <h1 className="text-xl font-bold text-white tracking-tight">AI Interview Session</h1>
+          <h1 className="text-xl font-bold text-white tracking-tight mr-2">AI Interview Session</h1>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            {isStrict && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] uppercase font-bold tracking-widest text-red-300 bg-red-500/10 border border-red-500/40 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.2)] hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all cursor-default">
+                <ShieldAlert size={12} className="animate-pulse" />
+                <span>Strict Mode</span>
+              </div>
+            )}
+
+            {targetCompany && targetCompany !== 'General' && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] uppercase font-bold tracking-widest text-violet-200 bg-violet-500/10 border border-violet-500/40 rounded-full shadow-[0_0_10px_rgba(139,92,246,0.2)] hover:shadow-[0_0_15px_rgba(139,92,246,0.4)] transition-all cursor-default">
+                <Building size={12} />
+                <span>{targetCompany}</span>
+              </div>
+            )}
+
+            {mode && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] uppercase font-bold tracking-widest text-cyan-200 bg-cyan-500/10 border border-cyan-500/40 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.2)] hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all cursor-default">
+                {mode.toLowerCase() === 'technical' ? <Code size={12} /> : <User size={12} />}
+                <span>{mode}</span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-6">
           <div className="flex flex-col items-end">
@@ -531,7 +718,12 @@ function Step2Interview({ interviewData, onFinish }) {
                 )}
                 <button
                   onClick={() => setIsCameraVisible(!isCameraVisible)}
-                  className="absolute -top-2 -right-2 bg-gray-800 text-white p-1.5 rounded-full hover:bg-gray-700 transition-colors border border-white/10 shadow-lg"
+                  disabled={isStrict}
+                  title={isStrict ? "Camera mandatory for Strict Mode" : "Toggle Camera"}
+                  className={`absolute -top-2 -right-2 p-1.5 rounded-full border shadow-lg transition-colors
+                    ${isStrict 
+                      ? 'bg-red-500/20 text-red-400 border-red-500/50 cursor-not-allowed' 
+                      : 'bg-gray-800 text-white hover:bg-gray-700 border-white/10'}`}
                 >
                   {isCameraVisible ? <VideoOff size={12} /> : <Video size={12} />}
                 </button>
@@ -606,15 +798,25 @@ function Step2Interview({ interviewData, onFinish }) {
              </div>
 
              {!feedback ? (
-              <motion.button
-                onClick={submitAnswer}
-                disabled={isSubmitting}
-                whileTap={{ scale: 0.98 }}
-                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-primary to-accent-secondary text-white py-3.5 rounded-xl font-semibold shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] transition-all disabled:opacity-50"
-              >
-                {isSubmitting ? "Evaluating..." : "Submit Answer"}
-                <Send size={16} />
-              </motion.button>
+              <div className="flex flex-col gap-3">
+                <motion.button
+                  onClick={submitAnswer}
+                  disabled={isSubmitting}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent-primary to-accent-secondary text-white py-3.5 rounded-xl font-semibold shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] transition-all disabled:opacity-50"
+                >
+                  {isSubmitting ? "Evaluating..." : "Submit Answer"}
+                  <Send size={16} />
+                </motion.button>
+                <motion.button
+                  onClick={handleSkipQuestion}
+                  disabled={isSubmitting}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white py-2.5 rounded-xl font-semibold transition-all disabled:opacity-50"
+                >
+                  Skip Question
+                </motion.button>
+              </div>
              ) : (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -652,7 +854,20 @@ function Step2Interview({ interviewData, onFinish }) {
           {currentQuestion?.questionType === 'coding' ? (
             <div className="flex-1 flex flex-col gap-6 min-h-0">
               {/* Editor Pane */}
-              <div className="flex-[0.7] min-h-[300px]">
+              <div className="flex-[0.7] min-h-[300px]"
+                onCopyCapture={(e) => {
+                  if (interviewData.interviewMode === 'Strict') {
+                    e.preventDefault();
+                    triggerCheatingPenalty("Copy/Paste Attempted");
+                  }
+                }}
+                onPasteCapture={(e) => {
+                  if (interviewData.interviewMode === 'Strict') {
+                    e.preventDefault();
+                    triggerCheatingPenalty("Copy/Paste Attempted");
+                  }
+                }}
+              >
                 <InterviewEditor 
                   codeAnswer={codeAnswer} 
                   setCodeAnswer={setCodeAnswer}
@@ -681,6 +896,18 @@ function Step2Interview({ interviewData, onFinish }) {
                </h3>
                <textarea
                   placeholder="Alternatively, type your thoughts here..."
+                  onCopy={(e) => {
+                    if (interviewData.interviewMode === 'Strict') {
+                      e.preventDefault();
+                      triggerCheatingPenalty("Copy/Paste Attempted");
+                    }
+                  }}
+                  onPaste={(e) => {
+                    if (interviewData.interviewMode === 'Strict') {
+                      e.preventDefault();
+                      triggerCheatingPenalty("Copy/Paste Attempted");
+                    }
+                  }}
                   onChange={(e) => {
                     const newVal = e.target.value;
                     if (interimTranscript && newVal.endsWith(interimTranscript)) {

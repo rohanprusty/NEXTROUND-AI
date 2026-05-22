@@ -84,7 +84,7 @@ Return strictly JSON:
 
 export const generateQuestion = async (req, res) => {
   try {
-    let { role, experience, mode, targetCompany, resumeText, projects, skills } = req.body
+    let { role, experience, mode, targetCompany, interviewMode, resumeText, projects, skills } = req.body
 
     role = role?.trim();
     experience = experience?.trim();
@@ -216,6 +216,7 @@ Make questions based on the candidate’s role, experience, InterviewMode, proje
     const interview = await Interview.create({
       userId: user._id,
       targetCompany: targetCompany || 'General',
+      interviewMode: interviewMode || 'Practice',
       role,
       experience,
       mode,
@@ -232,7 +233,10 @@ Make questions based on the candidate’s role, experience, InterviewMode, proje
       interviewId: interview._id,
       creditsLeft: user.credits,
       userName: user.name,
-      questions: interview.questions
+      questions: interview.questions,
+      targetCompany: interview.targetCompany,
+      interviewMode: interview.interviewMode,
+      mode: interview.mode
     });
   } catch (error) {
     return res.status(500).json({message:`failed to create interview ${error}`})
@@ -242,10 +246,42 @@ Make questions based on the candidate’s role, experience, InterviewMode, proje
 
 export const submitAnswer = async (req, res) => {
   try {
-    const { interviewId, questionIndex, answer, timeTaken, behavioralTelemetry, codeSnippet } = req.body
+    const { interviewId, questionIndex, answer, timeTaken, behavioralTelemetry, codeSnippet, cheatingFlags, isSkipped, isCheating, cheatingReason } = req.body
 
     const interview = await Interview.findById(interviewId)
     const question = interview.questions[questionIndex]
+
+    if (isCheating) {
+      question.score = 0;
+      question.cheatingDetected = true;
+      question.cheatingDetails = [cheatingReason];
+      question.feedback = "Cheating detected: " + cheatingReason + ". Score nullified.";
+      question.answer = answer || "";
+      if (codeSnippet) question.codeSnippet = codeSnippet;
+      
+      await interview.save();
+      return res.status(200).json({ feedback: question.feedback });
+    }
+
+    if (interview.interviewMode === 'Strict' && cheatingFlags && cheatingFlags.length > 0) {
+      question.score = 0;
+      question.cheatingDetected = true;
+      question.cheatingDetails = cheatingFlags;
+      question.feedback = "Cheating detected: " + cheatingFlags.join(", ") + ". Score nullified.";
+      question.answer = answer || "";
+      if (codeSnippet) question.codeSnippet = codeSnippet;
+      
+      await interview.save();
+      return res.status(200).json({ feedback: question.feedback });
+    }
+
+    if (isSkipped) {
+      question.score = 0;
+      question.feedback = "Question skipped by candidate. It is highly recommended to research this topic further.";
+      question.answer = "";
+      await interview.save();
+      return res.status(200).json({ feedback: question.feedback });
+    }
 
     // If no answer
     if (!answer) {
@@ -420,6 +456,8 @@ export const finishInterview = async (req,res) => {
         confidence: q.confidence || 0,
         communication: q.communication || 0,
         correctness: q.correctness || 0,
+        cheatingDetected: q.cheatingDetected || false,
+        cheatingDetails: q.cheatingDetails || [],
       })),
     })
   } catch (error) {
