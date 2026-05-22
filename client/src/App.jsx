@@ -12,7 +12,9 @@ import Pricing from './pages/Pricing'
 import InterviewReport from './pages/interviewReport'
 import toast from 'react-hot-toast'
 
-export const ServerUrl = "https://nextround-ai-backend.onrender.com";
+export const ServerUrl =  import.meta.env.MODE === "development"
+    ? "http://localhost:8000"
+    : "https://nextround-ai-backend.onrender.com";
 
 axios.interceptors.response.use(
   (response) => response,
