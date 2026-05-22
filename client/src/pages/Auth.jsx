@@ -25,7 +25,9 @@ function Auth({isModel = false}) {
             const result = await axios.post(ServerUrl + "/api/auth/google" , {name , email} , {withCredentials:true})
             dispatch(setUserData(result.data))
             
+            console.log("Login success! User data:", result.data);
             toast.success("Successfully logged in!", { duration: 2000 })
+            console.log("Navigating to /interview");
             navigate('/interview')
             
 

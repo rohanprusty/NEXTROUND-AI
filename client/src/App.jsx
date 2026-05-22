@@ -2,7 +2,7 @@ import React from 'react'
 import { Route, Routes } from 'react-router-dom'
 import Home from './pages/Home'
 import Auth from './pages/Auth'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useDispatch } from 'react-redux'
 import { setUserData } from './redux/userSlice'
@@ -11,10 +11,11 @@ import InterviewHistory from './pages/InterviewHistory'
 import Pricing from './pages/Pricing'
 import InterviewReport from './pages/interviewReport'
 import toast from 'react-hot-toast'
+import { onAuthStateChanged } from 'firebase/auth'
+import { auth } from './Utils/firebase'
+import ProtectedRoute from './components/ProtectedRoute'
 
-export const ServerUrl =  import.meta.env.MODE === "development"
-    ? "http://localhost:8000"
-    : "https://nextround-ai-backend.onrender.com";
+export const ServerUrl = import.meta.env.MODE === "development" ? "http://localhost:8000" : "https://nextround-ai-backend.onrender.com";
 
 axios.interceptors.response.use(
   (response) => response,
@@ -29,30 +30,48 @@ axios.interceptors.response.use(
 function App() {
 
   const dispatch = useDispatch()
+  const [loading, setLoading] = useState(true);
+
   useEffect(()=>{
-    const getUser = async () => {
-      try {
-        const result = await axios.get(ServerUrl + "/api/user/current-user", {withCredentials:true})
-        dispatch(setUserData(result.data))
-      } catch (error) {
-        console.log(error)
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Auth state changed. Firebase user present:", !!firebaseUser);
+      if (firebaseUser) {
+        try {
+          const result = await axios.get(ServerUrl + "/api/user/current-user", {withCredentials:true})
+          dispatch(setUserData(result.data))
+        } catch (error) {
+          console.log(error)
+          dispatch(setUserData(null))
+        }
+      } else {
         dispatch(setUserData(null))
       }
-    }
-    getUser()
+      setLoading(false);
+    });
 
+    return () => unsubscribe();
   },[dispatch])
+
   return (
     <Routes>
       <Route path='/' element={<Home/>}/>
       <Route path='/auth' element={<Auth/>}/>
-      <Route path='/interview' element={<InterviewPage/>}/>
-      <Route path='/history' element={<InterviewHistory/>}/>
+      <Route path='/interview' element={
+        <ProtectedRoute loading={loading}>
+          <InterviewPage/>
+        </ProtectedRoute>
+      }/>
+      <Route path='/history' element={
+        <ProtectedRoute loading={loading}>
+          <InterviewHistory/>
+        </ProtectedRoute>
+      }/>
       <Route path='/pricing' element={<Pricing/>}/>
-      <Route path='/report/:id' element={<InterviewReport/>}/>
-
-
-
+      <Route path='/report/:id' element={
+        <ProtectedRoute loading={loading}>
+          <InterviewReport/>
+        </ProtectedRoute>
+      }/>
     </Routes>
   )
 }

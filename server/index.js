@@ -10,11 +10,8 @@ import interviewRouter from "./routes/interview.route.js"
 import paymentRouter from "./routes/payment.route.js"
 
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://nextround-ai-frontend.onrender.com"
-  ],
-  credentials: true
+    origin: ["http://localhost:5173", "https://nextround-ai-frontend.onrender.com"],
+    credentials:true
 }))
 
 app.use(express.json())
