@@ -40,8 +40,18 @@ function App() {
           const result = await axios.get(ServerUrl + "/api/user/current-user", {withCredentials:true})
           dispatch(setUserData(result.data))
         } catch (error) {
-          console.log(error)
-          dispatch(setUserData(null))
+          console.log("Current user fetch failed (expected during login or 3rd-party cookie block):", error)
+          // Fallback: If GET fails (e.g. cookies blocked on cross-origin refresh),
+          // sync with backend again using Firebase user data to get fresh session.
+          try {
+             const fallbackResult = await axios.post(ServerUrl + "/api/auth/google", {
+                name: firebaseUser.displayName,
+                email: firebaseUser.email
+             }, {withCredentials:true});
+             dispatch(setUserData(fallbackResult.data));
+          } catch (fallbackError) {
+             console.log("Fallback auth failed", fallbackError);
+          }
         }
       } else {
         dispatch(setUserData(null))
