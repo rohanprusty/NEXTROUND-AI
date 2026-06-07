@@ -602,7 +602,7 @@ function Step2Interview({ interviewData, onFinish }) {
   };
 
   return (
-    <div className='min-h-screen bg-bg-primary p-4 sm:p-6 lg:p-8 flex flex-col gap-6 relative'>
+    <div className='h-screen w-full bg-bg-primary p-4 lg:p-6 flex flex-col gap-4 relative overflow-hidden'>
       {/* Full-screen Camera Warning Overlay */}
       {isStrict && !isCameraVisible && (
         <div className="fixed inset-0 z-[100] backdrop-blur-md bg-black/80 flex flex-col items-center justify-center p-6 text-center">
@@ -620,7 +620,7 @@ function Step2Interview({ interviewData, onFinish }) {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-accent-primary/10 blur-[150px] pointer-events-none" />
 
       {/* Header */}
-      <header className="flex justify-between items-center glass-card px-6 py-3 relative z-10">
+      <header className="flex justify-between items-center glass-card px-5 py-3 relative z-10 shrink-0">
         <div className="flex flex-wrap items-center gap-3">
           <Brain className="text-accent-primary" size={24} />
           <h1 className="text-xl font-bold text-white tracking-tight mr-2">AI Interview Session</h1>
@@ -659,14 +659,14 @@ function Step2Interview({ interviewData, onFinish }) {
       </header>
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10 min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 relative z-10 min-h-0 pb-2">
         
         {/* Left Column: AI Avatar & Feedback */}
-        <div className="lg:col-span-4 flex flex-col gap-6 min-h-0">
+        <div className="lg:col-span-4 flex flex-col gap-4 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           
           {/* Avatar Card */}
-          <div className="glass-card overflow-hidden flex flex-col relative group">
-            <div className="relative w-full aspect-[4/3] bg-black">
+          <div className="glass-card overflow-hidden flex flex-col relative group shrink-0">
+            <div className="relative w-full aspect-video bg-black">
               <video
                 src={videoSource}
                 key={videoSource}
@@ -674,7 +674,7 @@ function Step2Interview({ interviewData, onFinish }) {
                 muted
                 playsInline
                 preload="auto"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-top"
               />
               {/* AI Status Indicator */}
               <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
@@ -750,7 +750,7 @@ function Step2Interview({ interviewData, onFinish }) {
           </div>
 
           {/* Controls & Voice Input */}
-          <div className="glass-card p-6 flex flex-col gap-4">
+          <div className="glass-card p-5 flex flex-col gap-3 shrink-0">
              <div className="flex items-center gap-4">
                <motion.button
                 onClick={toggleMic}
@@ -838,10 +838,10 @@ function Step2Interview({ interviewData, onFinish }) {
         </div>
 
         {/* Right Column: Question, Editor & Terminal */}
-        <div className="lg:col-span-8 flex flex-col gap-6 min-h-0">
+        <div className="lg:col-span-8 flex flex-col gap-4 min-h-0">
           
           {/* Question Panel */}
-          <div className="glass-card p-6 border-l-4 border-l-accent-primary flex-shrink-0">
+          <div className="glass-card p-5 border-l-4 border-l-accent-primary flex-shrink-0">
             <h3 className="text-sm font-bold text-accent-secondary uppercase tracking-wider mb-2">Current Question</h3>
             {isIntroPhase ? (
                <p className="text-lg text-gray-400 animate-pulse">Initializing interview...</p>
@@ -852,7 +852,7 @@ function Step2Interview({ interviewData, onFinish }) {
 
           {/* IDE Area (Editor + Terminal) */}
           {currentQuestion?.questionType === 'coding' ? (
-            <div className="flex-1 flex flex-col gap-6 min-h-0">
+            <div className="flex-1 flex flex-col gap-4 min-h-0">
               {/* Editor Pane */}
               <div className="flex-[0.7] min-h-[300px]"
                 onCopyCapture={(e) => {
@@ -889,7 +889,7 @@ function Step2Interview({ interviewData, onFinish }) {
               </div>
             </div>
           ) : (
-            <div className="flex-1 glass-card p-6 flex flex-col relative overflow-hidden">
+            <div className="flex-1 glass-card p-5 flex flex-col relative overflow-hidden min-h-0">
                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none" />
                <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
                  <Eye size={16}/> Behavioral Focus Mode
