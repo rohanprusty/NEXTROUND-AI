@@ -41,32 +41,32 @@ function Auth({isModel = false}) {
   return (
     <div className={`
       w-full 
-      ${isModel ? "py-4" : "min-h-screen bg-[#f3f3f3] flex items-center justify-center px-6 py-20"}
+      ${isModel ? "py-4" : "min-h-screen bg-[#0a0a0f] flex items-center justify-center px-6 py-20"}
     `}>
         <motion.div 
         initial={{opacity:0 , y:-40}} 
         animate={{opacity:1 , y:0}} 
         transition={{duration:1.05}}
         className={`
-        w-full 
+        w-full relative
         ${isModel ? "max-w-md p-8 rounded-3xl" : "max-w-lg p-12 rounded-[32px]"}
-        bg-white shadow-2xl border border-gray-200
+        bg-[#131127]/80 backdrop-blur-2xl shadow-2xl border border-white/10
       `}>
             <div className='flex items-center justify-center gap-2 mb-6'>
                 <img src="/nextRound.png" alt="NextRound AI" className="w-10 h-10 object-contain rounded-xl" />
-                <h2 className='font-semibold text-lg'>NextRound AI</h2>
+                <h2 className='font-semibold text-lg text-white'>NextRound AI</h2>
             </div>
 
-            <h1 className='text-2xl md:text-3xl font-semibold text-center leading-snug mb-4'>
+            <h1 className='text-2xl md:text-3xl font-semibold text-center leading-snug mb-4 text-white'>
                 Continue with
-                <span className='bg-green-100 text-green-600 px-3 py-1 rounded-full inline-flex items-center gap-2'>
+                <span className='bg-green-500/20 text-green-400 px-3 py-1 rounded-full inline-flex items-center gap-2 ml-2'>
                     <IoSparkles size={16}/>
                     AI Smart Interview
 
                 </span>
             </h1>
 
-            <p className='text-gray-500 text-center text-sm md:text-base leading-relaxed mb-8'>
+            <p className='text-gray-400 text-center text-sm md:text-base leading-relaxed mb-8'>
                 Sign in to start AI-powered mock interviews,
         track your progress, and unlock detailed performance insights.
             </p>
@@ -76,11 +76,9 @@ function Auth({isModel = false}) {
             onClick={handleGoogleAuth}
             whileHover={{opacity:0.9 , scale:1.03}}
             whileTap={{opacity:1 , scale:0.98}}
-            className='w-full flex items-center justify-center gap-3 py-3 bg-black text-white rounded-full shadow-md '>
+            className='w-full flex items-center justify-center gap-3 py-3 bg-white text-black font-medium rounded-full shadow-lg border border-transparent hover:border-gray-300 transition-colors'>
                 <FcGoogle size={20}/>
                 Continue with Google
-
-   
             </motion.button>
         </motion.div>
 

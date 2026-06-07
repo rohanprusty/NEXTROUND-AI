@@ -15,12 +15,15 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from './Utils/firebase'
 import ProtectedRoute from './components/ProtectedRoute'
 
-export const ServerUrl = import.meta.env.MODE === "development" ? "http://localhost:8000" : "https://nextround-ai-backend.onrender.com";
+export const ServerUrl = "https://nextround-ai-backend.onrender.com";
 
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status >= 400) {
+    // Prevent showing a toast error for the expected 400 error from the production current-user endpoint
+    const isCurrentUserEndpoint = error.config && error.config.url && error.config.url.includes('/api/user/current-user');
+    
+    if (error.response && error.response.status >= 400 && !isCurrentUserEndpoint) {
       toast.error("An unexpected error occurred.");
     }
     return Promise.reject(error);
@@ -38,7 +41,11 @@ function App() {
       if (firebaseUser) {
         try {
           const result = await axios.get(ServerUrl + "/api/user/current-user", {withCredentials:true})
-          dispatch(setUserData(result.data))
+          if (result.data) {
+            dispatch(setUserData(result.data))
+          } else {
+            throw new Error("No session found, triggering fallback");
+          }
         } catch (error) {
           console.log("Current user fetch failed (expected during login or 3rd-party cookie block):", error)
           // Fallback: If GET fails (e.g. cookies blocked on cross-origin refresh),
